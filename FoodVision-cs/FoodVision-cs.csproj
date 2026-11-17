@@ -9,6 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.32.0" />
     <PackageReference Include="OpenCvSharp5" Version="5.1.0.20261115" />
-    <PackageReference Include="OpenCvSharp5.runtime.win" Version="5.1.0.20261115" />
+    <PackageReference Include="OpenCvSharp5.runtime.win" Version="5.1.0.20261115" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
+    <PackageReference Include="OpenCvSharp5.runtime.osx.arm64" Version="5.1.0.20261115" Condition="$([MSBuild]::IsOSPlatform('OSX'))" />
   </ItemGroup>
 </Project>
