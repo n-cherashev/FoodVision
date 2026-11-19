@@ -1,0 +1,12 @@
+.git
+.omx
+**/node_modules
+**/bin
+**/obj
+**/dist
+videos
+models
+.venv
+__pycache__
+*.user
+*.log
