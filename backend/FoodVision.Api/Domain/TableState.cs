@@ -2,7 +2,7 @@ using CSharpFunctionalExtensions;
 
 namespace FoodVision.Api.Domain;
 
-public enum TableState { Occupied, Available, Review }
+public enum TableState { Occupied, OccupiedWithItems, Available, Review }
 
 public sealed class BoundingBox
 {

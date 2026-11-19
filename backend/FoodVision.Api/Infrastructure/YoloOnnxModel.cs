@@ -1,5 +1,6 @@
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
+using FoodVision.Api.Utilites;
 
 namespace FoodVision.Api.Infrastructure;
 
@@ -79,7 +80,7 @@ internal sealed class YoloOnnxModel : IDisposable
                     if (score > confidence) { confidence = score; predictedClass = c; }
                 }
             }
-            if (predictedClass != classId || confidence < threshold) continue;
+            if ((classId >= 0 && predictedClass != classId) || confidence < threshold) continue;
 
             var centerX = (At(i, 0) - padX) / scale;
             var centerY = (At(i, 1) - padY) / scale;
@@ -104,8 +105,8 @@ internal sealed class YoloOnnxModel : IDisposable
                     if (joint is 11 or 12 && confidencePoint > .2f) { hipX += x * confidencePoint; hipY += y * confidencePoint; hipWeight += confidencePoint; }
                 }
             }
-            var seated = _pose && (HasFlexedKnee(keypoints, 11, 13, 15) || HasFlexedKnee(keypoints, 12, 14, 16));
-            detections.Add(new Detection(new Box(left, top, right - left, bottom - top), confidence,
+            var seated = _pose && (PoseCalculations.HasFlexedKnee(keypoints, 11, 13, 15) || PoseCalculations.HasFlexedKnee(keypoints, 12, 14, 16));
+            detections.Add(new Detection(new Box(left, top, right - left, bottom - top), confidence, predictedClass,
                 hipWeight > 0 ? hipX / hipWeight : centerX,
                 hipWeight > 0 ? hipY / hipWeight : centerY,
                 hipWeight > 0, seated));
@@ -118,32 +119,10 @@ internal sealed class YoloOnnxModel : IDisposable
         var selected = new List<Detection>();
         foreach (var detection in candidates.OrderByDescending(item => item.Score))
         {
-            if (selected.All(previous => IoU(previous.Box, detection.Box) < threshold)) selected.Add(detection);
+            if (selected.All(previous => previous.ClassId != detection.ClassId || Geometry.IoU(previous.Box, detection.Box) < threshold)) selected.Add(detection);
         }
         return selected;
     }
 
-    internal static float IoU(Box a, Box b)
-    {
-        var intersection = Math.Max(0, Math.Min(a.X + a.Width, b.X + b.Width) - Math.Max(a.X, b.X)) *
-                           Math.Max(0, Math.Min(a.Y + a.Height, b.Y + b.Height) - Math.Max(a.Y, b.Y));
-        return intersection / Math.Max(.001f, a.Width * a.Height + b.Width * b.Height - intersection);
-    }
-
-    private static bool HasFlexedKnee((float X, float Y, float Confidence)[] points, int hip, int knee, int ankle)
-    {
-        var a = points[hip]; var b = points[knee]; var c = points[ankle];
-        if (a.Confidence < .2f || b.Confidence < .2f || c.Confidence < .2f) return false;
-        var abx = a.X - b.X; var aby = a.Y - b.Y;
-        var cbx = c.X - b.X; var cby = c.Y - b.Y;
-        var denominator = Math.Sqrt((abx * abx + aby * aby) * (cbx * cbx + cby * cby));
-        if (denominator < 1) return false;
-        var angle = Math.Acos(Math.Clamp((abx * cbx + aby * cby) / denominator, -1, 1)) * 180 / Math.PI;
-        return angle is >= 55 and <= 145;
-    }
-
     public void Dispose() => _session.Dispose();
 }
-
-internal sealed record Box(float X, float Y, float Width, float Height);
-internal sealed record Detection(Box Box, float Score, float HipX, float HipY, bool HasHip, bool Seated);

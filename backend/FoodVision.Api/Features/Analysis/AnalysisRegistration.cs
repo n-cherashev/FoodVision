@@ -7,6 +7,7 @@ public static class AnalysisRegistration
     public static IServiceCollection AddAnalysisHandlers(this IServiceCollection services)
     {
         services.AddScoped<IRequestHandler<AnalyzeVideoRequest, FoodVision.Api.Domain.VideoAnalysis>, AnalyzeVideoHandler>();
+        services.AddScoped<IRequestHandler<ProposeTablesRequest, IReadOnlyList<FoodVision.Api.Domain.TableConfiguration>>, ProposeTablesHandler>();
         return services;
     }
 }

@@ -1,11 +1,12 @@
-import type { AnalysisResult } from "./types";
+import type { AnalysisResult, TableConfiguration } from "./types";
 
 const apiUrl = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
-export async function analyzeVideo(video: File, signal: AbortSignal): Promise<AnalysisResult> {
+async function postVideo(path: string, video: File, signal: AbortSignal, layout?: TableConfiguration[]) {
   const form = new FormData();
   form.append("video", video);
-  const response = await fetch(`${apiUrl}/api/analysis`, {
+  if (layout) form.append("layout", JSON.stringify(layout));
+  const response = await fetch(`${apiUrl}/api/analysis${path}`, {
     method: "POST",
     body: form,
     signal,
@@ -23,5 +24,14 @@ export async function analyzeVideo(video: File, signal: AbortSignal): Promise<An
     throw new Error(message || `Сервер вернул ошибку ${response.status}.`);
   }
 
-  return response.json() as Promise<AnalysisResult>;
+  return response.json();
+}
+
+export async function prepareTables(video: File, signal: AbortSignal): Promise<TableConfiguration[]> {
+  const result = await postVideo("/prepare", video, signal) as { tables: TableConfiguration[] };
+  return result.tables;
+}
+
+export async function analyzeVideo(video: File, layout: TableConfiguration[], signal: AbortSignal): Promise<AnalysisResult> {
+  return postVideo("", video, signal, layout) as Promise<AnalysisResult>;
 }

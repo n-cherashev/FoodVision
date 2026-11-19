@@ -1,4 +1,4 @@
-export type TableState = "occupied" | "available" | "review";
+export type TableState = "occupied" | "occupied_with_items" | "available" | "review";
 
 export interface Bounds {
   x: number;
@@ -17,6 +17,12 @@ export interface DetectedTable {
   id: string;
   bounds: Bounds;
   segments: StateSegment[];
+}
+
+export interface TableConfiguration {
+  id: string;
+  bounds: Bounds;
+  seatingZones: Bounds[];
 }
 
 export interface AnalysisResult {

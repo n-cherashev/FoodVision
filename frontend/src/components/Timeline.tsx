@@ -1,8 +1,9 @@
 import type { DetectedTable, TableState } from "../types";
 
 const labels: Record<TableState, string> = {
-  occupied: "занят",
-  available: "не занят",
+  occupied: "гости за столом",
+  occupied_with_items: "гостей нет, стол занят вещами",
+  available: "гостей и вещей нет",
   review: "нужна проверка",
 };
 
@@ -24,7 +25,7 @@ export function Timeline({ table, index, duration, onSeek }: TimelineProps) {
       <div className="bar" aria-label={`Состояния: стол ${index + 1}`}>
         {table.segments.map((segment, segmentIndex) => (
           <button
-            className={`segment ${segment.state}`}
+            className={`segment ${segment.state.replaceAll("_", "-")}`}
             key={`${segment.startSeconds}-${segmentIndex}`}
             title={`${labels[segment.state]}: ${formatTime(segment.startSeconds)}–${formatTime(segment.endSeconds)}`}
             style={{
@@ -40,7 +41,7 @@ export function Timeline({ table, index, duration, onSeek }: TimelineProps) {
       <div className="timeline-detail">
         {table.segments.map((segment, segmentIndex) => (
           <button key={`${segment.startSeconds}-${segmentIndex}`} onClick={() => onSeek(segment.startSeconds)}>
-            <i className={segment.state} /> {formatTime(segment.startSeconds)} — {labels[segment.state]}
+            <i className={segment.state.replaceAll("_", "-")} /> {formatTime(segment.startSeconds)} — {labels[segment.state]}
           </button>
         ))}
       </div>

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using FoodVision.Api.Domain;
+using FoodVision.Api.Utilites;
 using Microsoft.Extensions.Options;
 
 namespace FoodVision.Api.Infrastructure;
@@ -10,7 +11,47 @@ public sealed class VideoAnalyzer(IOptions<AnalysisOptions> configured, ILogger<
     private static readonly SemaphoreSlim GpuCapacity = new(1, 1);
     private readonly AnalysisOptions _options = configured.Value;
 
-    public async Task<VideoAnalysis> Analyze(IFormFile video, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<TableConfiguration>> ProposeTables(IFormFile video, CancellationToken cancellationToken)
+    {
+        await GpuCapacity.WaitAsync(cancellationToken);
+        var temporaryPath = Path.Combine(Path.GetTempPath(), $"foodvision-{Guid.NewGuid():N}{Path.GetExtension(video.FileName)}");
+        try
+        {
+            await using (var destination = new FileStream(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1024 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan))
+                await video.CopyToAsync(destination, cancellationToken);
+            var (sourceWidth, sourceHeight, _) = await ReadMetadata(temporaryPath, cancellationToken);
+            var ratio = Math.Min((double)_options.FrameSize / sourceWidth, (double)_options.FrameSize / sourceHeight);
+            var width = Math.Max(2, (int)(sourceWidth * ratio) / 2 * 2);
+            var height = Math.Max(2, (int)(sourceHeight * ratio) / 2 * 2);
+            using var model = new YoloOnnxModel(_options.TableDetectionModelPath, _options.FrameSize, pose: false);
+            using var decoder = StartFfmpeg(temporaryPath, width, height, .25);
+            var errorTask = decoder.StandardError.ReadToEndAsync(cancellationToken);
+            var frame = new byte[checked(width * height * 3)];
+            var proposer = new TableLayoutProposer(width, height);
+            try
+            {
+                while (await ReadFrame(decoder.StandardOutput.BaseStream, frame, cancellationToken))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    proposer.AddFrame(model.Detect(frame, width, height, .15f, classId: -1));
+                }
+            }
+            finally { if (!decoder.HasExited) decoder.Kill(entireProcessTree: true); }
+            var error = await errorTask;
+            await decoder.WaitForExitAsync(cancellationToken);
+            if (decoder.ExitCode != 0) throw new InvalidOperationException($"Не удалось подготовить видео: {error.Trim()}");
+            return proposer.Build();
+        }
+        finally
+        {
+            try { File.Delete(temporaryPath); }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            { logger.LogWarning(exception, "Could not delete temporary video {Path}", temporaryPath); }
+            finally { GpuCapacity.Release(); }
+        }
+    }
+
+    public async Task<VideoAnalysis> Analyze(IFormFile video, IReadOnlyList<TableConfiguration> configuredTables, CancellationToken cancellationToken)
     {
         await GpuCapacity.WaitAsync(cancellationToken);
         var temporaryPath = Path.Combine(Path.GetTempPath(), $"foodvision-{Guid.NewGuid():N}{Path.GetExtension(video.FileName)}");
@@ -29,7 +70,9 @@ public sealed class VideoAnalyzer(IOptions<AnalysisOptions> configured, ILogger<
             using var decoder = StartFfmpeg(temporaryPath, width, height);
             var decoderErrorTask = decoder.StandardError.ReadToEndAsync(cancellationToken);
             var frame = new byte[checked(width * height * 3)];
-            var tableTracks = new List<TableTrack>();
+            var tableTracks = configuredTables.Select(table => new TableTrack(table.Id,
+                new Box((float)(table.Bounds.X * width), (float)(table.Bounds.Y * height), (float)(table.Bounds.Width * width), (float)(table.Bounds.Height * height)),
+                table.SeatingZones.Select(zone => new Box((float)(zone.X * width), (float)(zone.Y * height), (float)(zone.Width * width), (float)(zone.Height * height))).ToArray())).ToList();
             var frameIndex = 0;
             var frameDuration = 1 / Math.Max(.1, _options.SamplingFramesPerSecond);
 
@@ -39,21 +82,19 @@ public sealed class VideoAnalyzer(IOptions<AnalysisOptions> configured, ILogger<
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     var seconds = frameIndex * frameDuration;
-                    var tableDetections = tablesModel.Detect(frame, width, height, .1f, classId: 60);
-                    if (tableTracks.Count == 0 && tableDetections.Count > 0)
-                    {
-                        foreach (var table in tableDetections.OrderBy(detection => detection.Box.Y).ThenBy(detection => detection.Box.X))
-                            tableTracks.Add(new TableTrack($"Стол {tableTracks.Count + 1}", table.Box));
-                        logger.LogInformation("Detected {Count} tables in the first usable frame at {TimeSeconds:F1} seconds.", tableTracks.Count, seconds);
-                    }
-
+                    var objectDetections = tablesModel.Detect(frame, width, height, .1f, classId: -1);
+                    var tableDetections = objectDetections.Where(detection => detection.ClassId == 60).ToArray();
                     if (tableTracks.Count > 0)
                     {
                         var people = peopleModel.Detect(frame, width, height, .08f, classId: 0);
-                        foreach (var table in tableTracks)
+                        var belongings = objectDetections.Where(detection => detection.ClassId is 24 or 26 or 28).ToArray();
+                        var assignedPeople = TablePersonAssignment.Assign(people,
+                            tableTracks.Select(table => new TableAssociation(table.Bounds, table.SeatingZones)).ToArray());
+                        for (var tableIndex = 0; tableIndex < tableTracks.Count; tableIndex++)
                         {
-                            var visible = tableDetections.Any(detection => YoloOnnxModel.IoU(table.Bounds, detection.Box) >= .2f);
-                            var state = visible ? Classify(table.Bounds, people) : TableState.Review;
+                            var table = tableTracks[tableIndex];
+                            var visible = tableDetections.Any(detection => Geometry.IoU(table.Bounds, detection.Box) >= .2f);
+                            var state = table.Seating.Classify(seconds, assignedPeople.People[tableIndex], belongings, visible, assignedPeople.Ambiguous[tableIndex]);
                             table.Samples.Add((seconds, state));
                         }
                     }
@@ -74,7 +115,7 @@ public sealed class VideoAnalyzer(IOptions<AnalysisOptions> configured, ILogger<
                     track.Bounds.Width / width, track.Bounds.Height / height);
                 if (boundsResult.IsFailure) throw new InvalidDataException(boundsResult.Error);
                 var tableResult = TableAnalysis.Create(track.Id, boundsResult.Value,
-                    BuildSegments(track.Samples, frameDuration, videoDuration));
+                    TimelineCalculations.BuildSegments(track.Samples, frameDuration, videoDuration));
                 if (tableResult.IsFailure) throw new InvalidDataException(tableResult.Error);
                 return tableResult.Value;
             }).ToArray();
@@ -111,8 +152,8 @@ public sealed class VideoAnalyzer(IOptions<AnalysisOptions> configured, ILogger<
         return (width, height, duration);
     }
 
-    private Process StartFfmpeg(string path, int width, int height) => Start(_options.FfmpegPath,
-        ["-v", "error", "-i", path, "-vf", $"fps={_options.SamplingFramesPerSecond.ToString(System.Globalization.CultureInfo.InvariantCulture)},scale={width}:{height}", "-f", "rawvideo", "-pix_fmt", "bgr24", "-"]);
+    private Process StartFfmpeg(string path, int width, int height, double? samplingFramesPerSecond = null) => Start(_options.FfmpegPath,
+        ["-v", "error", "-i", path, "-vf", $"fps={(samplingFramesPerSecond ?? _options.SamplingFramesPerSecond).ToString(System.Globalization.CultureInfo.InvariantCulture)},scale={width}:{height}", "-f", "rawvideo", "-pix_fmt", "bgr24", "-"]);
 
     private static Process Start(string executable, IEnumerable<string> arguments)
     {
@@ -134,64 +175,12 @@ public sealed class VideoAnalyzer(IOptions<AnalysisOptions> configured, ILogger<
         return true;
     }
 
-    private static TableState Classify(Box table, IReadOnlyList<Detection> people)
-    {
-        var zone = new Box(table.X - table.Width * .4f, table.Y - table.Height * .75f, table.Width * 1.8f, table.Height * 2.5f);
-        var candidates = people.Where(person => YoloOnnxModel.IoU(person.Box, zone) > .01f ||
-            (person.Box.X < zone.X + zone.Width && person.Box.X + person.Box.Width > zone.X &&
-             person.Box.Y < zone.Y + zone.Height && person.Box.Y + person.Box.Height > zone.Y)).ToArray();
-        if (candidates.Any(person => person.Seated && person.HasHip &&
-            person.HipX >= table.X - table.Width * .2f && person.HipX <= table.X + table.Width * 1.2f &&
-            person.HipY >= table.Y - table.Height * .35f && person.HipY <= table.Y + table.Height * 1.2f))
-            return TableState.Occupied;
-        if (candidates.Length > 0) return TableState.Review;
-        return TableState.Available;
-    }
-
-    private static IReadOnlyList<TimeSegment> BuildSegments(IReadOnlyList<(double Time, TableState State)> samples, double interval, double duration)
-    {
-        if (samples.Count == 0) return [];
-        var smoothed = samples.Select(sample => sample.State).ToArray();
-        var runs = new List<(int Start, int Count, TableState State)>();
-        for (var index = 0; index < smoothed.Length;)
-        {
-            var end = index + 1;
-            while (end < smoothed.Length && smoothed[end] == smoothed[index]) end++;
-            runs.Add((index, end - index, smoothed[index]));
-            index = end;
-        }
-        foreach (var (index, run) in runs.Select((run, index) => (index, run)))
-        {
-            if (run.Count >= 3 || runs.Count == 1) continue;
-            var replacement = index > 0 ? smoothed[run.Start - 1] : smoothed[run.Start + run.Count];
-            Array.Fill(smoothed, replacement, run.Start, run.Count);
-        }
-
-        var segments = new List<TimeSegment>();
-        var start = samples[0].Time;
-        var current = smoothed[0];
-        for (var i = 1; i < samples.Count; i++)
-        {
-            if (smoothed[i] == current) continue;
-            segments.Add(CreateSegment(start, Math.Min(duration, samples[i].Time), current));
-            start = samples[i].Time;
-            current = smoothed[i];
-        }
-        segments.Add(CreateSegment(start, Math.Min(duration, Math.Max(start + interval, samples[^1].Time + interval)), current));
-        return segments;
-    }
-
-    private static TimeSegment CreateSegment(double start, double end, TableState state)
-    {
-        var result = TimeSegment.Create(start, end, state);
-        if (result.IsFailure) throw new InvalidDataException(result.Error);
-        return result.Value;
-    }
-
-    private sealed class TableTrack(string id, Box bounds)
+    private sealed class TableTrack(string id, Box bounds, IReadOnlyList<Box> seatingZones)
     {
         public string Id { get; } = id;
         public Box Bounds { get; } = bounds;
+        public IReadOnlyList<Box> SeatingZones { get; } = seatingZones;
+        public SeatingAnalysis Seating { get; } = new(bounds, seatingZones);
         public List<(double Time, TableState State)> Samples { get; } = [];
     }
 }

@@ -4,5 +4,6 @@ namespace FoodVision.Api.Infrastructure;
 
 public interface IVideoAnalyzer
 {
-    Task<VideoAnalysis> Analyze(IFormFile video, CancellationToken cancellationToken);
+    Task<IReadOnlyList<TableConfiguration>> ProposeTables(IFormFile video, CancellationToken cancellationToken);
+    Task<VideoAnalysis> Analyze(IFormFile video, IReadOnlyList<TableConfiguration> tables, CancellationToken cancellationToken);
 }
