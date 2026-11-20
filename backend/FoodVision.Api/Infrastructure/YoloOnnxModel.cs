@@ -1,5 +1,4 @@
 using Microsoft.ML.OnnxRuntime;
-using Microsoft.ML.OnnxRuntime.Tensors;
 using FoodVision.Api.Utilites;
 
 namespace FoodVision.Api.Infrastructure;
@@ -11,6 +10,9 @@ internal sealed class YoloOnnxModel : IDisposable
     private readonly int _inputWidth;
     private readonly int _inputHeight;
     private readonly bool _pose;
+
+    public int InputWidth => _inputWidth;
+    public int InputHeight => _inputHeight;
 
     public YoloOnnxModel(string path, int size, bool pose)
     {
@@ -33,30 +35,12 @@ internal sealed class YoloOnnxModel : IDisposable
         _pose = pose;
     }
 
-    public IReadOnlyList<Detection> Detect(byte[] bgr, int width, int height, float threshold, int classId)
+    public IReadOnlyList<Detection> Detect(InferenceInput input, float threshold, int classId)
     {
-        var input = new DenseTensor<float>(new[] { 1, 3, _inputHeight, _inputWidth });
-        for (var i = 0; i < input.Length; i++) input.Buffer.Span[i] = 114f / 255f;
-        var scale = Math.Min((float)_inputWidth / width, (float)_inputHeight / height);
-        var scaledWidth = (int)Math.Round(width * scale);
-        var scaledHeight = (int)Math.Round(height * scale);
-        var padX = (_inputWidth - scaledWidth) / 2;
-        var padY = (_inputHeight - scaledHeight) / 2;
+        if (input.Width != _inputWidth || input.Height != _inputHeight)
+            throw new ArgumentException($"Входной тензор {input.Width}x{input.Height} не совпадает с размером модели {_inputWidth}x{_inputHeight}.", nameof(input));
 
-        for (var y = 0; y < scaledHeight; y++)
-        {
-            var sourceY = Math.Min(height - 1, (int)(y / scale));
-            for (var x = 0; x < scaledWidth; x++)
-            {
-                var sourceX = Math.Min(width - 1, (int)(x / scale));
-                var offset = (sourceY * width + sourceX) * 3;
-                input[0, 0, y + padY, x + padX] = bgr[offset + 2] / 255f;
-                input[0, 1, y + padY, x + padX] = bgr[offset + 1] / 255f;
-                input[0, 2, y + padY, x + padX] = bgr[offset] / 255f;
-            }
-        }
-
-        using var results = _session.Run([NamedOnnxValue.CreateFromTensor(_inputName, input)]);
+        using var results = _session.Run([NamedOnnxValue.CreateFromTensor(_inputName, input.Tensor)]);
         var output = results.First().AsTensor<float>();
         var shape = output.Dimensions.ToArray();
         var transposed = shape.Length == 3 && shape[1] < shape[2];
@@ -82,14 +66,14 @@ internal sealed class YoloOnnxModel : IDisposable
             }
             if ((classId >= 0 && predictedClass != classId) || confidence < threshold) continue;
 
-            var centerX = (At(i, 0) - padX) / scale;
-            var centerY = (At(i, 1) - padY) / scale;
-            var boxWidth = At(i, 2) / scale;
-            var boxHeight = At(i, 3) / scale;
-            var left = Math.Clamp(centerX - boxWidth / 2, 0, width);
-            var top = Math.Clamp(centerY - boxHeight / 2, 0, height);
-            var right = Math.Clamp(centerX + boxWidth / 2, 0, width);
-            var bottom = Math.Clamp(centerY + boxHeight / 2, 0, height);
+            var centerX = (At(i, 0) - input.PadX) / input.Scale;
+            var centerY = (At(i, 1) - input.PadY) / input.Scale;
+            var boxWidth = At(i, 2) / input.Scale;
+            var boxHeight = At(i, 3) / input.Scale;
+            var left = Math.Clamp(centerX - boxWidth / 2, 0, input.SourceWidth);
+            var top = Math.Clamp(centerY - boxHeight / 2, 0, input.SourceHeight);
+            var right = Math.Clamp(centerX + boxWidth / 2, 0, input.SourceWidth);
+            var bottom = Math.Clamp(centerY + boxHeight / 2, 0, input.SourceHeight);
             if (right - left < 2 || bottom - top < 2) continue;
 
             float hipY = 0, hipX = 0, hipWeight = 0;
@@ -98,8 +82,8 @@ internal sealed class YoloOnnxModel : IDisposable
             {
                 for (var joint = 0; joint < 17; joint++)
                 {
-                    var x = (At(i, 5 + joint * 3) - padX) / scale;
-                    var y = (At(i, 6 + joint * 3) - padY) / scale;
+                    var x = (At(i, 5 + joint * 3) - input.PadX) / input.Scale;
+                    var y = (At(i, 6 + joint * 3) - input.PadY) / input.Scale;
                     var confidencePoint = At(i, 7 + joint * 3);
                     keypoints[joint] = (x, y, confidencePoint);
                     if (joint is 11 or 12 && confidencePoint > .2f) { hipX += x * confidencePoint; hipY += y * confidencePoint; hipWeight += confidencePoint; }

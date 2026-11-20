@@ -4,6 +4,7 @@ import { SetupEditor } from "./components/SetupEditor";
 import { Timeline } from "./components/Timeline";
 import { UploadPanel } from "./components/UploadPanel";
 import { VideoViewer } from "./components/VideoViewer";
+import { BenchmarkPanel } from "./components/BenchmarkPanel";
 import type { AnalysisResult, TableConfiguration } from "./types";
 
 export default function App() {
@@ -13,6 +14,7 @@ export default function App() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState<"analysis" | "benchmark">("analysis");
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => () => { if (source) URL.revokeObjectURL(source); }, [source]);
@@ -63,6 +65,8 @@ export default function App() {
 
   return (
     <main>
+      <nav className="app-tabs" aria-label="Режим приложения"><button className={page === "analysis" ? "selected" : ""} onClick={() => setPage("analysis")}>Анализ видео</button><button className={page === "benchmark" ? "selected" : ""} onClick={() => setPage("benchmark")}>Бенчмарк</button></nav>
+      {page === "benchmark" ? <BenchmarkPanel /> : <>
       <UploadPanel file={file} loading={loading} prepared={tables !== null} analyzing={result !== null} canSubmit={tables === null || tables.length > 0} onFileChange={selectFile} onSubmit={tables === null ? propose : analyze} />
       {error && <p className="message error" role="alert">{error}</p>}
       {loading && <p className="message loading" role="status">{tables === null ? "Ищем столы на видео. Это может занять несколько минут." : "Анализируем подтверждённые столы и зоны посадки."}</p>}
@@ -85,6 +89,7 @@ export default function App() {
           )}
         </section>
       )}
+      </>}
     </main>
   );
 }

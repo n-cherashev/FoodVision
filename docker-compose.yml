@@ -8,12 +8,16 @@ services:
     environment:
       ASPNETCORE_URLS: http://+:8080
       Analysis__PersonPoseModelPath: /app/models/yolo11x-pose.onnx
+      Analysis__PersonDetectionModelPath: /app/models/yolo26l-detect.onnx
       Analysis__TableDetectionModelPath: /app/models/yolo11x.onnx
       Analysis__FfmpegPath: ffmpeg
       Analysis__FfprobePath: ffprobe
+      # Measured stable limit on the current RTX 5070 Ti; higher values saturated VRAM.
+      Analysis__BenchmarkGpuConcurrency: 10
       Cors__Origins__0: http://localhost:8081
     volumes:
       - ./models:/app/models:ro
+      - ./videos:/app/videos:ro
     gpus: all
     restart: unless-stopped
 

@@ -6,14 +6,12 @@ using Microsoft.Extensions.Options;
 
 namespace FoodVision.Api.Infrastructure;
 
-public sealed class VideoAnalyzer(IOptions<AnalysisOptions> configured, ILogger<VideoAnalyzer> logger) : IVideoAnalyzer
+internal sealed class VideoAnalyzer(InferenceRuntime inferenceRuntime, IOptions<AnalysisOptions> configured, ILogger<VideoAnalyzer> logger) : IVideoAnalyzer
 {
-    private static readonly SemaphoreSlim GpuCapacity = new(1, 1);
     private readonly AnalysisOptions _options = configured.Value;
 
     public async Task<IReadOnlyList<TableConfiguration>> ProposeTables(IFormFile video, CancellationToken cancellationToken)
     {
-        await GpuCapacity.WaitAsync(cancellationToken);
         var temporaryPath = Path.Combine(Path.GetTempPath(), $"foodvision-{Guid.NewGuid():N}{Path.GetExtension(video.FileName)}");
         try
         {
@@ -23,7 +21,7 @@ public sealed class VideoAnalyzer(IOptions<AnalysisOptions> configured, ILogger<
             var ratio = Math.Min((double)_options.FrameSize / sourceWidth, (double)_options.FrameSize / sourceHeight);
             var width = Math.Max(2, (int)(sourceWidth * ratio) / 2 * 2);
             var height = Math.Max(2, (int)(sourceHeight * ratio) / 2 * 2);
-            using var model = new YoloOnnxModel(_options.TableDetectionModelPath, _options.FrameSize, pose: false);
+            var model = inferenceRuntime.TableDetector;
             using var decoder = StartFfmpeg(temporaryPath, width, height, .25);
             var errorTask = decoder.StandardError.ReadToEndAsync(cancellationToken);
             var frame = new byte[checked(width * height * 3)];
@@ -33,7 +31,11 @@ public sealed class VideoAnalyzer(IOptions<AnalysisOptions> configured, ILogger<
                 while (await ReadFrame(decoder.StandardOutput.BaseStream, frame, cancellationToken))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    proposer.AddFrame(model.Detect(frame, width, height, .15f, classId: -1));
+                    using var gpuLease = await GpuInferenceGate.EnterInferenceAsync(cancellationToken);
+                    using var inputLease = inferenceRuntime.RentInput();
+                    var workspace = inputLease.Workspace;
+                    workspace.Prepare(frame, width, height);
+                    proposer.AddFrame(model.Detect(workspace.TableInput, .15f, classId: -1));
                 }
             }
             finally { if (!decoder.HasExited) decoder.Kill(entireProcessTree: true); }
@@ -47,13 +49,11 @@ public sealed class VideoAnalyzer(IOptions<AnalysisOptions> configured, ILogger<
             try { File.Delete(temporaryPath); }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             { logger.LogWarning(exception, "Could not delete temporary video {Path}", temporaryPath); }
-            finally { GpuCapacity.Release(); }
         }
     }
 
     public async Task<VideoAnalysis> Analyze(IFormFile video, IReadOnlyList<TableConfiguration> configuredTables, CancellationToken cancellationToken)
     {
-        await GpuCapacity.WaitAsync(cancellationToken);
         var temporaryPath = Path.Combine(Path.GetTempPath(), $"foodvision-{Guid.NewGuid():N}{Path.GetExtension(video.FileName)}");
         try
         {
@@ -65,8 +65,9 @@ public sealed class VideoAnalyzer(IOptions<AnalysisOptions> configured, ILogger<
             var width = Math.Max(2, (int)(sourceWidth * ratio) / 2 * 2);
             var height = Math.Max(2, (int)(sourceHeight * ratio) / 2 * 2);
 
-            using var tablesModel = new YoloOnnxModel(_options.TableDetectionModelPath, _options.FrameSize, pose: false);
-            using var peopleModel = new YoloOnnxModel(_options.PersonPoseModelPath, _options.FrameSize, pose: true);
+            var tablesModel = inferenceRuntime.TableDetector;
+            var peopleModel = inferenceRuntime.PersonPose;
+            var personDetector = inferenceRuntime.PersonDetector;
             using var decoder = StartFfmpeg(temporaryPath, width, height);
             var decoderErrorTask = decoder.StandardError.ReadToEndAsync(cancellationToken);
             var frame = new byte[checked(width * height * 3)];
@@ -82,11 +83,23 @@ public sealed class VideoAnalyzer(IOptions<AnalysisOptions> configured, ILogger<
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     var seconds = frameIndex * frameDuration;
-                    var objectDetections = tablesModel.Detect(frame, width, height, .1f, classId: -1);
+                    IReadOnlyList<Detection> objectDetections;
+                    IReadOnlyList<Detection> people = Array.Empty<Detection>();
+                    using (var gpuLease = await GpuInferenceGate.EnterInferenceAsync(cancellationToken))
+                    using (var inputLease = inferenceRuntime.RentInput())
+                    {
+                        var workspace = inputLease.Workspace;
+                        workspace.Prepare(frame, width, height);
+                        objectDetections = tablesModel.Detect(workspace.TableInput, .1f, classId: -1);
+                        if (tableTracks.Count > 0)
+                        {
+                            var poses = peopleModel.Detect(workspace.PoseInput, .08f, classId: 0);
+                            people = personDetector.Detect(workspace.PersonInput, poses);
+                        }
+                    }
                     var tableDetections = objectDetections.Where(detection => detection.ClassId == 60).ToArray();
                     if (tableTracks.Count > 0)
                     {
-                        var people = peopleModel.Detect(frame, width, height, .08f, classId: 0);
                         var belongings = objectDetections.Where(detection => detection.ClassId is 24 or 26 or 28).ToArray();
                         var assignedPeople = TablePersonAssignment.Assign(people,
                             tableTracks.Select(table => new TableAssociation(table.Bounds, table.SeatingZones)).ToArray());
@@ -128,7 +141,6 @@ public sealed class VideoAnalyzer(IOptions<AnalysisOptions> configured, ILogger<
             try { File.Delete(temporaryPath); }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             { logger.LogWarning(exception, "Could not delete temporary video {Path}", temporaryPath); }
-            finally { GpuCapacity.Release(); }
         }
     }
 

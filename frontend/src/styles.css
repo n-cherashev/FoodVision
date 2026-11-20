@@ -48,6 +48,26 @@ i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }.occu
 .layout-canvas.drawing { cursor: crosshair; }
 .editable-marker { pointer-events: auto; cursor: grab; }
 .editable-marker:active { cursor: grabbing; }
+.app-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+.app-tabs button, .benchmark-controls button, .benchmark-pagination button { border: 1px solid #527568; border-radius: 9px; padding: 10px 15px; color: #dff2e8; background: #25473c; font-weight: 650; }
+.app-tabs button.selected, .benchmark-controls button:not(.secondary-button) { color: #11251f; background: #a9e6be; border-color: #a9e6be; }
+.benchmark-panel { padding: 28px; border: 1px solid #3a6658; border-radius: 20px; background: rgba(19, 47, 40, .92); }
+.benchmark-panel h2 { margin-bottom: 10px; }
+.benchmark-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 22px 0; }
+.connection-state { color: #9bd4bb; padding: 0 8px; }
+.benchmark-summary { display: flex; flex-wrap: wrap; gap: 12px 20px; padding: 15px; margin-bottom: 18px; border-radius: 10px; background: #10241f; color: #bdd0c9; font-size: .88rem; }
+.benchmark-summary strong { color: #eef3f1; }
+.benchmark-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.benchmark-pagination { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px; margin-top: 18px; color: #bdd0c9; font-size: .88rem; }
+.benchmark-stream { min-width: 0; padding: 13px; border: 1px solid #365c50; border-radius: 12px; background: rgba(16, 36, 31, .8); }
+.stream-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 9px; }
+.stream-title h3 { margin: 0; }
+.stream-status { color: #bdd0c9; font-size: .8rem; }
+.stream-status.running { color: #a9e6be; }.stream-status.error { color: #ffb1a7; }.stream-status.completed { color: #9bd4bb; }
+.benchmark-stream canvas { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: contain; background: #06110e; border-radius: 7px; }
+.stream-stats { display: grid; gap: 4px; margin-top: 10px; color: #bdd0c9; font-size: .75rem; }
+.stream-error { margin: 8px 0 0; color: #ffb1a7; overflow-wrap: anywhere; }
+@media (max-width: 800px) { .benchmark-panel { padding: 18px; }.benchmark-grid { grid-template-columns: 1fr; } }
 .active-tool { outline: 2px solid #f0c765; outline-offset: 2px; }
 .drawing-hint { margin: -6px 0 16px; color: #f0c765; font-size: .9rem; }
 @media (max-width: 800px) { .setup-editor { padding: 18px; }.setup-heading { align-items: flex-start; flex-direction: column; }.coordinate-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }.table-config { padding: 14px; } }
