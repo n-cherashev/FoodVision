@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Tables.Domain/Tables.Domain.csproj" />
+    <ProjectReference Include="../Tables.Contracts/Tables.Contracts.csproj" />
+  </ItemGroup>
+</Project>

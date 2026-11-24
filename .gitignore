@@ -32,3 +32,6 @@ Thumbs.db
 /frontend/dist/
 /frontend/*.tsbuildinfo
 /.playwright-mcp/
+
+# Local PostgreSQL configuration (credentials)
+/docker/.env.postgres
