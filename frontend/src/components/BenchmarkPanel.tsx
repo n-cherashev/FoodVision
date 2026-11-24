@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 type StreamMetric = { id: number; status: string; accepted?: number; processed?: number; skipped?: number; dropped?: number; overBudget?: number; tableCount?: number; tableStates?: Record<string, number>; objectDetections?: number; personDetections?: number; cpuPercent?: number; memoryMb?: number; deliveredFps?: number; analyticsFps?: number; queueWaitAvgMs?: number; queueWaitP95Ms?: number; queueWaitMaxMs?: number; inferenceAvgMs?: number; inferenceP95Ms?: number; inferenceMaxMs?: number; preprocessingAvgMs?: number; tableInferenceAvgMs?: number; poseInferenceAvgMs?: number; personInferenceAvgMs?: number; latencyAvgMs?: number; latencyP95Ms?: number; latencyMaxMs?: number; clientLatencyAvgMs?: number; clientLatencyP95Ms?: number; clientLatencyMaxMs?: number; error?: string };
 type RunInfo = { startedAt?: string; appVersion?: string; sourceFps?: number; durationSeconds?: number; elapsedSeconds?: number; sourceResolution?: string; videoFps?: number; analyticsFps?: number; gpuConcurrency?: number; resolution?: string; model?: string; gpu?: string; videoMemory?: string };
 const apiUrl = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
-const streamCount = 50;
+const streamCount = 10;
 const streamsPerPage = 10;
 
 export function BenchmarkPanel() {

@@ -13,7 +13,8 @@ namespace FoodVision.Api.Benchmark;
 
 public sealed class BenchmarkRunner(IServiceProvider services, IOptions<AnalysisOptions> configured, ILogger<BenchmarkRunner> logger) : IBenchmarkRunner
 {
-    private const int StreamCount = 50;
+    private const int DefaultStreamCount = 10;
+    private const int MaximumBenchmarkStreamCount = 50;
     private const int DeliveryFps = 5;
     private static readonly SemaphoreSlim SocketSend = new(1, 1);
     private static readonly SemaphoreSlim ActiveBenchmark = new(1, 1);
@@ -26,8 +27,11 @@ public sealed class BenchmarkRunner(IServiceProvider services, IOptions<Analysis
         if (!context.WebSockets.IsWebSocketRequest) { context.Response.StatusCode = 400; return; }
         using var socket = await context.WebSockets.AcceptWebSocketAsync();
         using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+        var streamCount = int.TryParse(context.Request.Query["streams"], out var requestedStreamCount)
+            ? Math.Clamp(requestedStreamCount, 1, MaximumBenchmarkStreamCount)
+            : DefaultStreamCount;
         var view = new ViewRange();
-        await Send(socket, new { type = "ready", streams = StreamCount, file = "videos/Sample_Video_1.mp4", analyticsFps = _options.SamplingFramesPerSecond }, lifetime.Token);
+        await Send(socket, new { type = "ready", streams = streamCount, file = "videos/Sample_Video_1.mp4", analyticsFps = _options.SamplingFramesPerSecond }, lifetime.Token);
         var buffer = new byte[1024];
         CancellationTokenSource? runLifetime = null;
         Task? runTask = null;
@@ -41,13 +45,13 @@ public sealed class BenchmarkRunner(IServiceProvider services, IOptions<Analysis
                 var action = ReadAction(command);
                 if (action == "view")
                 {
-                    view.Update(command, StreamCount);
+                    view.Update(command, streamCount);
                 }
                 else if (action == "start" && (runTask is null || runTask.IsCompleted))
                 {
                     runLifetime?.Dispose();
                     runLifetime = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
-                    runTask = RunStreams(socket, view, runLifetime.Token);
+                    runTask = RunStreams(socket, view, streamCount, runLifetime.Token);
                     _ = runTask.ContinueWith(async _ =>
                     {
                         if (socket.State == WebSocketState.Open) await Send(socket, new { type = "run-complete" }, lifetime.Token);
@@ -68,19 +72,19 @@ public sealed class BenchmarkRunner(IServiceProvider services, IOptions<Analysis
         }
     }
 
-    private async Task RunStreams(WebSocket socket, ViewRange view, CancellationToken cancellationToken)
+    private async Task RunStreams(WebSocket socket, ViewRange view, int streamCount, CancellationToken cancellationToken)
     {
         if (!await ActiveBenchmark.WaitAsync(0, cancellationToken))
         {
-            await Send(socket, new { type = "fatal", error = "Другой 50-поточный бенчмарк уже выполняется." }, cancellationToken);
+            await Send(socket, new { type = "fatal", error = "Другой бенчмарк уже выполняется." }, cancellationToken);
             return;
         }
 
-        try { await RunStreamsCore(socket, view, _inferenceRuntime, cancellationToken); }
+        try { await RunStreamsCore(socket, view, streamCount, _inferenceRuntime, cancellationToken); }
         finally { ActiveBenchmark.Release(); }
     }
 
-    private async Task RunStreamsCore(WebSocket socket, ViewRange view, InferenceRuntime inferenceRuntime, CancellationToken cancellationToken)
+    private async Task RunStreamsCore(WebSocket socket, ViewRange view, int streamCount, InferenceRuntime inferenceRuntime, CancellationToken cancellationToken)
     {
         var path = Path.Combine(Directory.GetCurrentDirectory(), "videos", "Sample_Video_1.mp4");
         if (!File.Exists(path)) { await Send(socket, new { type = "fatal", error = $"Не найден файл {path}. Подготовьте видео по инструкции README." }, cancellationToken); return; }
@@ -111,8 +115,8 @@ public sealed class BenchmarkRunner(IServiceProvider services, IOptions<Analysis
             }
             var started = Stopwatch.GetTimestamp();
             var startedAt = DateTimeOffset.UtcNow;
-            await Send(socket, new { type = "run-start", startedAt, appVersion = typeof(BenchmarkRunner).Assembly.GetName().Version?.ToString() ?? "unknown", streams = StreamCount, sourceFps = videoInfo.Fps, durationSeconds = videoInfo.Duration, sourceResolution = $"{videoInfo.Width}x{videoInfo.Height}", videoFps = DeliveryFps, analyticsFps = _options.SamplingFramesPerSecond, gpuConcurrency = GpuInferenceGate.BenchmarkConcurrency, resolution = "640x360", model = Path.GetFileName(_options.PersonDetectionModelPath) + " + " + Path.GetFileName(_options.PersonPoseModelPath) + " + " + Path.GetFileName(_options.TableDetectionModelPath), cpu = "process CPU", memory = "process working set", gpu = "unavailable: NVIDIA telemetry tool is not installed", videoMemory = "unavailable: NVIDIA telemetry tool is not installed" }, cancellationToken);
-            var tasks = Enumerable.Range(1, StreamCount).Select(id => ProcessStream(socket, id, path, detector, pose, personDetector, inferenceRuntime, view, started, cancellationToken)).ToArray();
+            await Send(socket, new { type = "run-start", startedAt, appVersion = typeof(BenchmarkRunner).Assembly.GetName().Version?.ToString() ?? "unknown", streams = streamCount, sourceFps = videoInfo.Fps, durationSeconds = videoInfo.Duration, sourceResolution = $"{videoInfo.Width}x{videoInfo.Height}", videoFps = DeliveryFps, analyticsFps = _options.SamplingFramesPerSecond, gpuConcurrency = GpuInferenceGate.BenchmarkConcurrency, resolution = "640x360", model = Path.GetFileName(_options.PersonDetectionModelPath) + " + " + Path.GetFileName(_options.PersonPoseModelPath) + " + " + Path.GetFileName(_options.TableDetectionModelPath), cpu = "process CPU", memory = "process working set", gpu = "unavailable: NVIDIA telemetry tool is not installed", videoMemory = "unavailable: NVIDIA telemetry tool is not installed" }, cancellationToken);
+            var tasks = Enumerable.Range(1, streamCount).Select(id => ProcessStream(socket, id, path, detector, pose, personDetector, inferenceRuntime, view, started, cancellationToken)).ToArray();
             await Task.WhenAll(tasks);
             await Send(socket, new { type = "run-end", endedAt = DateTimeOffset.UtcNow, elapsedSeconds = (Stopwatch.GetTimestamp() - started) / (double)Stopwatch.Frequency }, cancellationToken);
         }
