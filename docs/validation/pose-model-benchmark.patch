@@ -1,0 +1,14 @@
+diff --git a/backend/src/Modules/VideoAnalytics/VideoAnalytics.Infrastructure/Benchmark/BenchmarkRunner.cs b/backend/src/Modules/VideoAnalytics/VideoAnalytics.Infrastructure/Benchmark/BenchmarkRunner.cs
+index 0e645b2..4f86692 100644
+--- a/backend/src/Modules/VideoAnalytics/VideoAnalytics.Infrastructure/Benchmark/BenchmarkRunner.cs
++++ b/backend/src/Modules/VideoAnalytics/VideoAnalytics.Infrastructure/Benchmark/BenchmarkRunner.cs
+@@ -176,7 +176,8 @@ public sealed class BenchmarkRunner(IServiceProvider services, IOptions<Analysis
+                     var poses = pose.Detect(workspace.PoseInput, .08f, 0);
+                     var poseInferenceMs = (Stopwatch.GetTimestamp() - stageStart) * 1000d / Stopwatch.Frequency;
+                     stageStart = Stopwatch.GetTimestamp();
+-                    people = personDetector.Detect(workspace.PersonInput, poses);
++                    people = Environment.GetEnvironmentVariable("FOODVISION_POSE_ONLY") == "1"
++                        ? poses : personDetector.Detect(workspace.PersonInput, poses);
+                     var personInferenceMs = (Stopwatch.GetTimestamp() - stageStart) * 1000d / Stopwatch.Frequency;
+                     lock (statisticsSync)
+                     {

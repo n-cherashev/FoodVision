@@ -68,6 +68,7 @@ internal sealed class VideoAnalyzer(InferenceRuntime inferenceRuntime, IOptions<
             var tablesModel = inferenceRuntime.TableDetector;
             var peopleModel = inferenceRuntime.PersonPose;
             var personDetector = inferenceRuntime.PersonDetector;
+            var rfdetrModel = inferenceRuntime.RfDetrKeypoint;
             using var decoder = StartFfmpeg(temporaryPath, width, height);
             var decoderErrorTask = decoder.StandardError.ReadToEndAsync(cancellationToken);
             var frame = new byte[checked(width * height * 3)];
@@ -93,8 +94,17 @@ internal sealed class VideoAnalyzer(InferenceRuntime inferenceRuntime, IOptions<
                         objectDetections = tablesModel.Detect(workspace.TableInput, .1f, classId: -1);
                         if (tableTracks.Count > 0)
                         {
-                            var poses = peopleModel.Detect(workspace.PoseInput, .08f, classId: 0);
-                            people = personDetector.Detect(workspace.PersonInput, poses);
+                            if (rfdetrModel is not null && workspace.RfDetrKeypointInput is not null)
+                            {
+                                people = rfdetrModel.Detect(workspace.RfDetrKeypointInput);
+                            }
+                            else if (peopleModel is not null)
+                            {
+                                var poses = peopleModel.Detect(workspace.PoseInput, .08f, classId: 0);
+                                people = personDetector is not null && workspace.PersonInput is not null
+                                    ? personDetector.Detect(workspace.PersonInput, poses)
+                                    : poses;
+                            }
                         }
                     }
                     var tableDetections = objectDetections.Where(detection => detection.ClassId == 60).ToArray();

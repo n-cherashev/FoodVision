@@ -1,0 +1,49 @@
+diff --git a/backend/src/Modules/VideoAnalytics/VideoAnalytics.Infrastructure/Benchmark/BenchmarkRunner.cs b/backend/src/Modules/VideoAnalytics/VideoAnalytics.Infrastructure/Benchmark/BenchmarkRunner.cs
+index 0e645b2..ee700ec 100644
+--- a/backend/src/Modules/VideoAnalytics/VideoAnalytics.Infrastructure/Benchmark/BenchmarkRunner.cs
++++ b/backend/src/Modules/VideoAnalytics/VideoAnalytics.Infrastructure/Benchmark/BenchmarkRunner.cs
+@@ -151,6 +151,9 @@ public sealed class BenchmarkRunner(IServiceProvider services, IOptions<Analysis
+         var personInferenceTimes = new RollingSamples();
+         var statisticsSync = new object();
+         var analyticsFrames = new LatestFrameQueue();
++        var experiment = Environment.GetEnvironmentVariable("FOODVISION_EXPERIMENT") ?? "baseline";
++        IReadOnlyList<Detection> cachedPoses = Array.Empty<Detection>();
++        var analyzedFrames = 0;
+         Task? analyticsTask = null;
+         async Task AnalyzeFrames()
+         {
+@@ -173,10 +176,15 @@ public sealed class BenchmarkRunner(IServiceProvider services, IOptions<Analysis
+                     detections = detector.Detect(workspace.TableInput, .1f, -1);
+                     var tableInferenceMs = (Stopwatch.GetTimestamp() - stageStart) * 1000d / Stopwatch.Frequency;
+                     stageStart = Stopwatch.GetTimestamp();
+-                    var poses = pose.Detect(workspace.PoseInput, .08f, 0);
++                    var poses = experiment == "pose-every-two" && analyzedFrames % 2 == 1
++                        ? cachedPoses : pose.Detect(workspace.PoseInput, .08f, 0);
++                    cachedPoses = poses;
++                    analyzedFrames++;
+                     var poseInferenceMs = (Stopwatch.GetTimestamp() - stageStart) * 1000d / Stopwatch.Frequency;
+                     stageStart = Stopwatch.GetTimestamp();
+-                    people = personDetector.Detect(workspace.PersonInput, poses);
++                    people = experiment == "reuse-detector"
++                        ? PersonDetector.AttachPoses(detections.Where(detection => detection.ClassId == 0), poses)
++                        : personDetector.Detect(workspace.PersonInput, poses);
+                     var personInferenceMs = (Stopwatch.GetTimestamp() - stageStart) * 1000d / Stopwatch.Frequency;
+                     lock (statisticsSync)
+                     {
+diff --git a/backend/src/Modules/VideoAnalytics/VideoAnalytics.Infrastructure/Infrastructure/PersonDetector.cs b/backend/src/Modules/VideoAnalytics/VideoAnalytics.Infrastructure/Infrastructure/PersonDetector.cs
+index 0a0acba..8a50dcb 100644
+--- a/backend/src/Modules/VideoAnalytics/VideoAnalytics.Infrastructure/Infrastructure/PersonDetector.cs
++++ b/backend/src/Modules/VideoAnalytics/VideoAnalytics.Infrastructure/Infrastructure/PersonDetector.cs
+@@ -49,6 +49,12 @@ internal sealed class PersonDetector : IDisposable
+         foreach (var person in candidates.OrderByDescending(item => item.Score))
+             if (selected.All(other => Geometry.IoU(person.Box, other.Box) < .45f)) selected.Add(person);
+ 
++        return AttachPoses(selected, poses);
++    }
++
++    public static IReadOnlyList<Detection> AttachPoses(IEnumerable<Detection> detections, IReadOnlyList<Detection> poses)
++    {
++        var selected = detections.ToList();
+         // A pose contributes posture only to its best matching detected person, once.
+         var pairs = (from personIndex in Enumerable.Range(0, selected.Count)
+                      from poseIndex in Enumerable.Range(0, poses.Count)

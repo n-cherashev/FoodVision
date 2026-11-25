@@ -1,0 +1,100 @@
+{
+  "candidate": "RFDETRKeypointPreview",
+  "threshold": 0.4,
+  "frames": [
+    {
+      "frame": "compare10.bgr",
+      "baseline": 8,
+      "candidate": 7,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 3,
+      "bothHaveHip": 3
+    },
+    {
+      "frame": "compare30.bgr",
+      "baseline": 8,
+      "candidate": 7,
+      "matchedIoU50": 7,
+      "seatedDisagreement": 1,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "compare50.bgr",
+      "baseline": 8,
+      "candidate": 7,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 5
+    },
+    {
+      "frame": "compare70.bgr",
+      "baseline": 7,
+      "candidate": 8,
+      "matchedIoU50": 5,
+      "seatedDisagreement": 3,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "compare90.bgr",
+      "baseline": 11,
+      "candidate": 9,
+      "matchedIoU50": 8,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 3
+    },
+    {
+      "frame": "compare110.bgr",
+      "baseline": 9,
+      "candidate": 7,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "compare130.bgr",
+      "baseline": 9,
+      "candidate": 8,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 1,
+      "bothHaveHip": 3
+    },
+    {
+      "frame": "compare150.bgr",
+      "baseline": 10,
+      "candidate": 7,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 1,
+      "bothHaveHip": 2
+    },
+    {
+      "frame": "compare170.bgr",
+      "baseline": 10,
+      "candidate": 7,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 2
+    },
+    {
+      "frame": "compare190.bgr",
+      "baseline": 9,
+      "candidate": 10,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 1,
+      "bothHaveHip": 4
+    }
+  ],
+  "totals": {
+    "baseline": 89,
+    "candidate": 77,
+    "matchedIoU50": 62,
+    "seatedDisagreement": 18,
+    "bothHaveHip": 34
+  },
+  "baselineMedianPoseMs": 27.5341,
+  "baselineMedianTwoModelMs": 36.9725,
+  "candidateMedianOnnxInferenceMs": 16.29293999985748,
+  "candidateMedianPreprocessingMs": 5.625133499961521,
+  "candidateMedianDecodingMs": 3.232401500099513,
+  "candidateMedianModelDecodeMs": 19.54724150027687,
+  "candidateMedianTotalMs": 25.125587500042457
+}

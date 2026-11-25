@@ -1,0 +1,500 @@
+{
+  "candidate": "RFDETRKeypointPreview",
+  "threshold": 0.4,
+  "frames": [
+    {
+      "frame": "early-scene-025s.bgr",
+      "baseline": 7,
+      "candidate": 7,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 0,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "early-scene-026s.bgr",
+      "baseline": 8,
+      "candidate": 7,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 1,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "early-scene-027s.bgr",
+      "baseline": 7,
+      "candidate": 6,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 3
+    },
+    {
+      "frame": "early-scene-028s.bgr",
+      "baseline": 7,
+      "candidate": 6,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 3
+    },
+    {
+      "frame": "early-scene-029s.bgr",
+      "baseline": 7,
+      "candidate": 6,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 1,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "early-scene-030s.bgr",
+      "baseline": 8,
+      "candidate": 7,
+      "matchedIoU50": 7,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "early-scene-031s.bgr",
+      "baseline": 8,
+      "candidate": 8,
+      "matchedIoU50": 8,
+      "seatedDisagreement": 1,
+      "bothHaveHip": 5
+    },
+    {
+      "frame": "early-scene-032s.bgr",
+      "baseline": 8,
+      "candidate": 7,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 5
+    },
+    {
+      "frame": "early-scene-033s.bgr",
+      "baseline": 8,
+      "candidate": 6,
+      "matchedIoU50": 5,
+      "seatedDisagreement": 1,
+      "bothHaveHip": 5
+    },
+    {
+      "frame": "early-scene-034s.bgr",
+      "baseline": 7,
+      "candidate": 8,
+      "matchedIoU50": 7,
+      "seatedDisagreement": 1,
+      "bothHaveHip": 5
+    },
+    {
+      "frame": "late-scene-a-145s.bgr",
+      "baseline": 11,
+      "candidate": 10,
+      "matchedIoU50": 9,
+      "seatedDisagreement": 1,
+      "bothHaveHip": 7
+    },
+    {
+      "frame": "late-scene-a-146s.bgr",
+      "baseline": 11,
+      "candidate": 11,
+      "matchedIoU50": 8,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 7
+    },
+    {
+      "frame": "late-scene-a-147s.bgr",
+      "baseline": 11,
+      "candidate": 11,
+      "matchedIoU50": 9,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 7
+    },
+    {
+      "frame": "late-scene-a-148s.bgr",
+      "baseline": 10,
+      "candidate": 7,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 3
+    },
+    {
+      "frame": "late-scene-a-149s.bgr",
+      "baseline": 10,
+      "candidate": 5,
+      "matchedIoU50": 4,
+      "seatedDisagreement": 1,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "late-scene-a-150s.bgr",
+      "baseline": 11,
+      "candidate": 6,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "late-scene-a-151s.bgr",
+      "baseline": 12,
+      "candidate": 9,
+      "matchedIoU50": 9,
+      "seatedDisagreement": 4,
+      "bothHaveHip": 5
+    },
+    {
+      "frame": "late-scene-a-152s.bgr",
+      "baseline": 11,
+      "candidate": 7,
+      "matchedIoU50": 5,
+      "seatedDisagreement": 0,
+      "bothHaveHip": 2
+    },
+    {
+      "frame": "late-scene-a-153s.bgr",
+      "baseline": 12,
+      "candidate": 9,
+      "matchedIoU50": 8,
+      "seatedDisagreement": 1,
+      "bothHaveHip": 6
+    },
+    {
+      "frame": "late-scene-a-154s.bgr",
+      "baseline": 10,
+      "candidate": 9,
+      "matchedIoU50": 8,
+      "seatedDisagreement": 3,
+      "bothHaveHip": 7
+    },
+    {
+      "frame": "late-scene-b-185s.bgr",
+      "baseline": 8,
+      "candidate": 9,
+      "matchedIoU50": 7,
+      "seatedDisagreement": 4,
+      "bothHaveHip": 3
+    },
+    {
+      "frame": "late-scene-b-186s.bgr",
+      "baseline": 9,
+      "candidate": 9,
+      "matchedIoU50": 8,
+      "seatedDisagreement": 3,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "late-scene-b-187s.bgr",
+      "baseline": 10,
+      "candidate": 8,
+      "matchedIoU50": 7,
+      "seatedDisagreement": 1,
+      "bothHaveHip": 3
+    },
+    {
+      "frame": "late-scene-b-188s.bgr",
+      "baseline": 9,
+      "candidate": 8,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "late-scene-b-189s.bgr",
+      "baseline": 8,
+      "candidate": 8,
+      "matchedIoU50": 5,
+      "seatedDisagreement": 1,
+      "bothHaveHip": 2
+    },
+    {
+      "frame": "late-scene-b-190s.bgr",
+      "baseline": 11,
+      "candidate": 9,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "late-scene-b-191s.bgr",
+      "baseline": 8,
+      "candidate": 8,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 1,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "late-scene-b-192s.bgr",
+      "baseline": 8,
+      "candidate": 7,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "late-scene-b-193s.bgr",
+      "baseline": 9,
+      "candidate": 8,
+      "matchedIoU50": 7,
+      "seatedDisagreement": 1,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "late-scene-b-194s.bgr",
+      "baseline": 8,
+      "candidate": 7,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 0,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "mid-scene-a-065s.bgr",
+      "baseline": 10,
+      "candidate": 7,
+      "matchedIoU50": 5,
+      "seatedDisagreement": 1,
+      "bothHaveHip": 1
+    },
+    {
+      "frame": "mid-scene-a-066s.bgr",
+      "baseline": 9,
+      "candidate": 7,
+      "matchedIoU50": 5,
+      "seatedDisagreement": 0,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "mid-scene-a-067s.bgr",
+      "baseline": 9,
+      "candidate": 7,
+      "matchedIoU50": 5,
+      "seatedDisagreement": 0,
+      "bothHaveHip": 3
+    },
+    {
+      "frame": "mid-scene-a-068s.bgr",
+      "baseline": 7,
+      "candidate": 6,
+      "matchedIoU50": 4,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 3
+    },
+    {
+      "frame": "mid-scene-a-069s.bgr",
+      "baseline": 8,
+      "candidate": 9,
+      "matchedIoU50": 7,
+      "seatedDisagreement": 3,
+      "bothHaveHip": 5
+    },
+    {
+      "frame": "mid-scene-a-070s.bgr",
+      "baseline": 9,
+      "candidate": 8,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 4,
+      "bothHaveHip": 5
+    },
+    {
+      "frame": "mid-scene-a-071s.bgr",
+      "baseline": 8,
+      "candidate": 8,
+      "matchedIoU50": 7,
+      "seatedDisagreement": 1,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "mid-scene-a-072s.bgr",
+      "baseline": 7,
+      "candidate": 6,
+      "matchedIoU50": 5,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "mid-scene-a-073s.bgr",
+      "baseline": 7,
+      "candidate": 9,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 4,
+      "bothHaveHip": 6
+    },
+    {
+      "frame": "mid-scene-a-074s.bgr",
+      "baseline": 8,
+      "candidate": 8,
+      "matchedIoU50": 7,
+      "seatedDisagreement": 3,
+      "bothHaveHip": 6
+    },
+    {
+      "frame": "mid-scene-b-105s.bgr",
+      "baseline": 9,
+      "candidate": 10,
+      "matchedIoU50": 7,
+      "seatedDisagreement": 3,
+      "bothHaveHip": 5
+    },
+    {
+      "frame": "mid-scene-b-106s.bgr",
+      "baseline": 10,
+      "candidate": 9,
+      "matchedIoU50": 8,
+      "seatedDisagreement": 4,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "mid-scene-b-107s.bgr",
+      "baseline": 11,
+      "candidate": 9,
+      "matchedIoU50": 7,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 1
+    },
+    {
+      "frame": "mid-scene-b-108s.bgr",
+      "baseline": 8,
+      "candidate": 6,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 5
+    },
+    {
+      "frame": "mid-scene-b-109s.bgr",
+      "baseline": 9,
+      "candidate": 7,
+      "matchedIoU50": 5,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 3
+    },
+    {
+      "frame": "mid-scene-b-110s.bgr",
+      "baseline": 10,
+      "candidate": 7,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 5
+    },
+    {
+      "frame": "mid-scene-b-111s.bgr",
+      "baseline": 7,
+      "candidate": 8,
+      "matchedIoU50": 7,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 6
+    },
+    {
+      "frame": "mid-scene-b-112s.bgr",
+      "baseline": 8,
+      "candidate": 9,
+      "matchedIoU50": 7,
+      "seatedDisagreement": 4,
+      "bothHaveHip": 3
+    },
+    {
+      "frame": "mid-scene-b-113s.bgr",
+      "baseline": 10,
+      "candidate": 9,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "mid-scene-b-114s.bgr",
+      "baseline": 10,
+      "candidate": 10,
+      "matchedIoU50": 7,
+      "seatedDisagreement": 4,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "title-to-scene-003s.bgr",
+      "baseline": 0,
+      "candidate": 0,
+      "matchedIoU50": 0,
+      "seatedDisagreement": 0,
+      "bothHaveHip": 0
+    },
+    {
+      "frame": "title-to-scene-004s.bgr",
+      "baseline": 0,
+      "candidate": 0,
+      "matchedIoU50": 0,
+      "seatedDisagreement": 0,
+      "bothHaveHip": 0
+    },
+    {
+      "frame": "title-to-scene-005s.bgr",
+      "baseline": 0,
+      "candidate": 0,
+      "matchedIoU50": 0,
+      "seatedDisagreement": 0,
+      "bothHaveHip": 0
+    },
+    {
+      "frame": "title-to-scene-006s.bgr",
+      "baseline": 9,
+      "candidate": 7,
+      "matchedIoU50": 5,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 2
+    },
+    {
+      "frame": "title-to-scene-007s.bgr",
+      "baseline": 6,
+      "candidate": 10,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 3,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "title-to-scene-008s.bgr",
+      "baseline": 9,
+      "candidate": 10,
+      "matchedIoU50": 8,
+      "seatedDisagreement": 0,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "title-to-scene-009s.bgr",
+      "baseline": 9,
+      "candidate": 7,
+      "matchedIoU50": 7,
+      "seatedDisagreement": 4,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "title-to-scene-010s.bgr",
+      "baseline": 8,
+      "candidate": 6,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 1,
+      "bothHaveHip": 3
+    },
+    {
+      "frame": "title-to-scene-011s.bgr",
+      "baseline": 7,
+      "candidate": 7,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 0,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "title-to-scene-012s.bgr",
+      "baseline": 7,
+      "candidate": 6,
+      "matchedIoU50": 6,
+      "seatedDisagreement": 1,
+      "bothHaveHip": 3
+    }
+  ],
+  "totals": {
+    "baseline": 501,
+    "candidate": 445,
+    "matchedIoU50": 366,
+    "seatedDisagreement": 106,
+    "bothHaveHip": 235
+  },
+  "baselineMedianPoseMs": 24.77985,
+  "baselineMedianTwoModelMs": 34.32965,
+  "candidateMedianOnnxInferenceMs": 16.315327500251442,
+  "candidateMedianPreprocessingMs": 5.905947500195907,
+  "candidateMedianDecodingMs": 3.1423710001945437,
+  "candidateMedianModelDecodeMs": 19.474055499813403,
+  "candidateMedianTotalMs": 25.33512599984533
+}

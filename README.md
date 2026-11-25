@@ -5,8 +5,8 @@
 ## Запуск на Windows с Docker Desktop и NVIDIA GPU
 
 1. Установите Docker Desktop с поддержкой NVIDIA GPU и свежий драйвер NVIDIA.
-2. Поместите подготовленную pose-модель `models/yolo11x-pose.onnx` в `models/`.
-3. Скачайте модели обнаружения объектов и людей: `powershell -ExecutionPolicy Bypass -File scripts/setup-models.ps1` (источники — [YOLO11-ONNX](https://huggingface.co/unileon-robotics/YOLO11-ONNX) и [YOLO26l ONNX](https://huggingface.co/qtpose/yolo26l-detect-onnx)). Скрипт проверяет SHA-256 YOLO26l. Веса YOLO26l распространяются под AGPL-3.0; для коммерческого применения проверьте условия лицензирования.
+2. Поместите подготовленную pose-модель `models/rfdetr-keypoint-preview.onnx` в `models/`.
+3. Скачайте модель обнаружения объектов: `powershell -ExecutionPolicy Bypass -File scripts/setup-models.ps1` (источник столов и вещей — [YOLO11-ONNX](https://huggingface.co/unileon-robotics/YOLO11-ONNX)). Скрипт проверяет SHA-256 моделей. Веса моделей распространяются в соответствии с условиями лицензирования правообладателей.
 4. Запустите `docker compose up --build`.
 5. Откройте <http://localhost:8081>, выберите видео и нажмите «Найти столы».
 

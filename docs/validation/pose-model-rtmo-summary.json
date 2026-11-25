@@ -1,0 +1,95 @@
+{
+  "metric": "agreement with current FoodVision output; not ground-truth accuracy",
+  "iouThreshold": 0.5,
+  "frames": [
+    {
+      "frame": "compare10.bgr",
+      "baseline": 8,
+      "rtmo": 18,
+      "matchedIouAtLeast0_5": 6,
+      "seatedDisagreement": 3,
+      "bothHaveHip": 3
+    },
+    {
+      "frame": "compare30.bgr",
+      "baseline": 8,
+      "rtmo": 24,
+      "matchedIouAtLeast0_5": 7,
+      "seatedDisagreement": 3,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "compare50.bgr",
+      "baseline": 8,
+      "rtmo": 22,
+      "matchedIouAtLeast0_5": 6,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 5
+    },
+    {
+      "frame": "compare70.bgr",
+      "baseline": 7,
+      "rtmo": 20,
+      "matchedIouAtLeast0_5": 4,
+      "seatedDisagreement": 1,
+      "bothHaveHip": 2
+    },
+    {
+      "frame": "compare90.bgr",
+      "baseline": 11,
+      "rtmo": 22,
+      "matchedIouAtLeast0_5": 8,
+      "seatedDisagreement": 2,
+      "bothHaveHip": 3
+    },
+    {
+      "frame": "compare110.bgr",
+      "baseline": 9,
+      "rtmo": 25,
+      "matchedIouAtLeast0_5": 7,
+      "seatedDisagreement": 3,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "compare130.bgr",
+      "baseline": 9,
+      "rtmo": 21,
+      "matchedIouAtLeast0_5": 8,
+      "seatedDisagreement": 4,
+      "bothHaveHip": 4
+    },
+    {
+      "frame": "compare150.bgr",
+      "baseline": 10,
+      "rtmo": 27,
+      "matchedIouAtLeast0_5": 9,
+      "seatedDisagreement": 5,
+      "bothHaveHip": 3
+    },
+    {
+      "frame": "compare170.bgr",
+      "baseline": 10,
+      "rtmo": 25,
+      "matchedIouAtLeast0_5": 8,
+      "seatedDisagreement": 3,
+      "bothHaveHip": 2
+    },
+    {
+      "frame": "compare190.bgr",
+      "baseline": 9,
+      "rtmo": 21,
+      "matchedIouAtLeast0_5": 7,
+      "seatedDisagreement": 3,
+      "bothHaveHip": 4
+    }
+  ],
+  "totals": {
+    "baseline": 89,
+    "rtmo": 225,
+    "matchedIouAtLeast0_5": 70,
+    "seatedDisagreement": 29,
+    "bothHaveHip": 34
+  },
+  "baselineMedianTotalMs": 36.9725,
+  "rtmoMedianModelInvocationMs": 8.37555905006866
+}

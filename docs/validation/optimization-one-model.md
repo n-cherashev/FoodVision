@@ -1,0 +1,7 @@
+# Experiment 4: feasibility of one model
+
+24 November 2026. Inspected the actual ONNX output signatures and current decoder. `yolo11x.onnx` outputs `[1,84,6300]`: four box values and 80 object-class scores, with no keypoints. `yolo11x-pose.onnx` outputs `[1,56,33600]`: four box values, one person score and 17 three-value keypoints, with no table or belongings classes. `yolo26l-detect.onnx` outputs `[1,300,6]` detection rows, without pose keypoints. The current algorithm uses the object model's table and belongings classes and pose keypoints in addition to person boxes.
+
+Therefore none of the three available model files individually supplies all inputs required by the current algorithm. Combining the existing graphs into one file would still execute their separate computations and does not itself prove a speedup. A genuinely shared multi-task network or a different model would need to provide all required outputs and be evaluated with labelled restaurant data. [Ultralytics pose documentation](https://docs.ultralytics.com/tasks/pose) describes the pose outputs and COCO-keypoints pretraining; it does not establish that its pose model detects this project's other object classes.
+
+No single-model throughput or accuracy benchmark was run: no suitable trained multi-task model or labelled evaluation set is available locally. This is a feasibility check, not a completed model comparison. The earlier [two-call experiment](optimization-reuse-detector.md) is the closest tested reduction in calls.

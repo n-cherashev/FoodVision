@@ -1,0 +1,477 @@
+{
+    "schemaVersion":  1,
+    "source":  {
+                   "file":  "videos/Sample_Video_1.mp4",
+                   "sha256":  "D5454EAED10013A6A3A8E41A2CA4474C6C2002B9BEA96CAC06B67EEA680C573E"
+               },
+    "extraction":  {
+                       "tool":  "ffmpeg via foodvision-optimization-experiment Docker image",
+                       "gpuUsed":  false,
+                       "seekMode":  "accurate (-ss after -i)",
+                       "cadenceFps":  1,
+                       "pixelFormat":  "bgr24",
+                       "width":  640,
+                       "height":  360,
+                       "bytesPerFrame":  691200
+                   },
+    "intervals":  [
+                      {
+                          "id":  "title-to-scene",
+                          "startSeconds":  3,
+                          "endSeconds":  12,
+                          "frameCount":  10
+                      },
+                      {
+                          "id":  "early-scene",
+                          "startSeconds":  25,
+                          "endSeconds":  34,
+                          "frameCount":  10
+                      },
+                      {
+                          "id":  "mid-scene-a",
+                          "startSeconds":  65,
+                          "endSeconds":  74,
+                          "frameCount":  10
+                      },
+                      {
+                          "id":  "mid-scene-b",
+                          "startSeconds":  105,
+                          "endSeconds":  114,
+                          "frameCount":  10
+                      },
+                      {
+                          "id":  "late-scene-a",
+                          "startSeconds":  145,
+                          "endSeconds":  154,
+                          "frameCount":  10
+                      },
+                      {
+                          "id":  "late-scene-b",
+                          "startSeconds":  185,
+                          "endSeconds":  194,
+                          "frameCount":  10
+                      }
+                  ],
+    "frames":  [
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/title-to-scene-003s.bgr",
+                       "interval":  "title-to-scene",
+                       "timestampSeconds":  3,
+                       "sha256":  "A126D43B2E3EB4712D98778C4E6EB9CDA7D7427718064C0D8DB30404BA36F867",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/title-to-scene-004s.bgr",
+                       "interval":  "title-to-scene",
+                       "timestampSeconds":  4,
+                       "sha256":  "EB15D0DCECB29440F1D11105C321228E8734552244508BEFF6C69C709F917AA5",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/title-to-scene-005s.bgr",
+                       "interval":  "title-to-scene",
+                       "timestampSeconds":  5,
+                       "sha256":  "2E1EAB1F60D32C87BCCE152580CDD1F04B66396B29A210085E55EB262DF75E13",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/title-to-scene-006s.bgr",
+                       "interval":  "title-to-scene",
+                       "timestampSeconds":  6,
+                       "sha256":  "D4A9FED94642766E52426FC5BF6F0A0188AC3E6C41F38EC247789EEE96A644BB",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/title-to-scene-007s.bgr",
+                       "interval":  "title-to-scene",
+                       "timestampSeconds":  7,
+                       "sha256":  "0901AFC9361F92A730C0091A5B81CFFEEB4C3F2A4AD31F93C3507F6CFA9EBA33",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/title-to-scene-008s.bgr",
+                       "interval":  "title-to-scene",
+                       "timestampSeconds":  8,
+                       "sha256":  "B1282237E44B433AD4D761B224E43559F96EFC8A0E81ADD98B75A44BCF006A4A",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/title-to-scene-009s.bgr",
+                       "interval":  "title-to-scene",
+                       "timestampSeconds":  9,
+                       "sha256":  "859A01E0A688B3F59D1EC0F81FAEAC5482093130A8216A1554CB9850A1F13BA2",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/title-to-scene-010s.bgr",
+                       "interval":  "title-to-scene",
+                       "timestampSeconds":  10,
+                       "sha256":  "1B123DA69643F2E759DB46931AE6B15CC090B34C9522FBE502C8CA97DF64B040",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/title-to-scene-011s.bgr",
+                       "interval":  "title-to-scene",
+                       "timestampSeconds":  11,
+                       "sha256":  "71EF1400FB233847157EEBA4AF84E44A05B03C0EC9F4FA7CB4970F604E2CCD65",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/title-to-scene-012s.bgr",
+                       "interval":  "title-to-scene",
+                       "timestampSeconds":  12,
+                       "sha256":  "7E86A483B9DA4B60935D9B78823B754FB6B3C0377AFD73F22588E3C8FEC59FFF",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/early-scene-025s.bgr",
+                       "interval":  "early-scene",
+                       "timestampSeconds":  25,
+                       "sha256":  "0D9FF4389456D379C939373FC6157F945722D99062C40457B8C87811DD3665E5",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/early-scene-026s.bgr",
+                       "interval":  "early-scene",
+                       "timestampSeconds":  26,
+                       "sha256":  "0608ABDD0AE033037BBEB5E3FF7C34A88FAEBA6365AC66A1BF6FD6E61B0A92B4",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/early-scene-027s.bgr",
+                       "interval":  "early-scene",
+                       "timestampSeconds":  27,
+                       "sha256":  "5DC906BA39290811DC4BC7F3845FCB11F6B6A670852A265D2CCC56AB0C01E6DB",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/early-scene-028s.bgr",
+                       "interval":  "early-scene",
+                       "timestampSeconds":  28,
+                       "sha256":  "476C726118C64BE0DD30DE671F0EEECF51DD6D11D013A36CFA9431F4746102E8",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/early-scene-029s.bgr",
+                       "interval":  "early-scene",
+                       "timestampSeconds":  29,
+                       "sha256":  "C0C978F519F809A99EF3F68D5AC701524A8C1ED6471B9495899D9E1EC5A1BA9E",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/early-scene-030s.bgr",
+                       "interval":  "early-scene",
+                       "timestampSeconds":  30,
+                       "sha256":  "056AAC373429F3BADEA13A357BB950EF09E4D4718F4DC20C94239C7D998A9139",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/early-scene-031s.bgr",
+                       "interval":  "early-scene",
+                       "timestampSeconds":  31,
+                       "sha256":  "89495CE5B69B2716CD22F4ED3E2E04D598AA8F28C1A8E66A43024E5BD6481A33",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/early-scene-032s.bgr",
+                       "interval":  "early-scene",
+                       "timestampSeconds":  32,
+                       "sha256":  "5B936E1AB8BE4CD548C829DF1F6E1021C96A5548344AC648679FA4756792B270",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/early-scene-033s.bgr",
+                       "interval":  "early-scene",
+                       "timestampSeconds":  33,
+                       "sha256":  "2550DAE1C6D502CFD400AB1D4EDD33E0FE63EE83A61C1A5B69D8454E1A2C1CF8",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/early-scene-034s.bgr",
+                       "interval":  "early-scene",
+                       "timestampSeconds":  34,
+                       "sha256":  "018E563D89B850316F6E64D021E2911EF014F0B7C354120012160805A52597B8",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/mid-scene-a-065s.bgr",
+                       "interval":  "mid-scene-a",
+                       "timestampSeconds":  65,
+                       "sha256":  "7581C4F0CEEBB3A51E437B8E3F79C937A213600C15E13E612E808BD11DC2EFE3",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/mid-scene-a-066s.bgr",
+                       "interval":  "mid-scene-a",
+                       "timestampSeconds":  66,
+                       "sha256":  "FD97100A1BD8F4FBBA0B477D6B37ABE8EDD998C5C85F691330D59095CCFE9DD3",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/mid-scene-a-067s.bgr",
+                       "interval":  "mid-scene-a",
+                       "timestampSeconds":  67,
+                       "sha256":  "182FF75579C414FE2DC366B50FAE470DC2DB2E4933EB55512EE76F36CB7634E5",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/mid-scene-a-068s.bgr",
+                       "interval":  "mid-scene-a",
+                       "timestampSeconds":  68,
+                       "sha256":  "4CE056761A0E145CA5904667F510D70FC7F03325E087DEE1055F1F9CBA88BE33",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/mid-scene-a-069s.bgr",
+                       "interval":  "mid-scene-a",
+                       "timestampSeconds":  69,
+                       "sha256":  "1C6CA51BB182855AE4ED286EE1E214AB1C85BEB45A3006EC270D71F8AADA8CC9",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/mid-scene-a-070s.bgr",
+                       "interval":  "mid-scene-a",
+                       "timestampSeconds":  70,
+                       "sha256":  "20B3EC4330F3BC47824251D09812DD8F2E9250E127C328B97D36C07078090A29",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/mid-scene-a-071s.bgr",
+                       "interval":  "mid-scene-a",
+                       "timestampSeconds":  71,
+                       "sha256":  "E682F90E7812D1603F9A0293A06426F10585D77CEB0932B67992D67D6D793505",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/mid-scene-a-072s.bgr",
+                       "interval":  "mid-scene-a",
+                       "timestampSeconds":  72,
+                       "sha256":  "3E8AFE45236A061BBEA1F68A976615359B4F8EF21506CC8DF174F8F080EE6328",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/mid-scene-a-073s.bgr",
+                       "interval":  "mid-scene-a",
+                       "timestampSeconds":  73,
+                       "sha256":  "081C4724CA5D09CDC338D10469A211668F8A43275DAB6344B6144382C93170DE",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/mid-scene-a-074s.bgr",
+                       "interval":  "mid-scene-a",
+                       "timestampSeconds":  74,
+                       "sha256":  "BBFEB0303D299FE346F2158DE5DCBD27578D15DA6A541F94B1A091E5B6AF2D1E",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/mid-scene-b-105s.bgr",
+                       "interval":  "mid-scene-b",
+                       "timestampSeconds":  105,
+                       "sha256":  "85364C6425E478C95E2B5B6D8AE31374604E47CDC2208A8C61C3DA1EA04D1A02",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/mid-scene-b-106s.bgr",
+                       "interval":  "mid-scene-b",
+                       "timestampSeconds":  106,
+                       "sha256":  "4936DEAE601A72DB3EA583E8C8AFA0F2638177E962CF9840FF7790C1406805A0",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/mid-scene-b-107s.bgr",
+                       "interval":  "mid-scene-b",
+                       "timestampSeconds":  107,
+                       "sha256":  "CDDF0285576B2737BB563697E6AEF5BB121A4883E6AD58192786CDD32ECD0E20",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/mid-scene-b-108s.bgr",
+                       "interval":  "mid-scene-b",
+                       "timestampSeconds":  108,
+                       "sha256":  "891C2E055C48CDFD815750A898C3614AB40C79C6EDE56FBEF167065A22038E82",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/mid-scene-b-109s.bgr",
+                       "interval":  "mid-scene-b",
+                       "timestampSeconds":  109,
+                       "sha256":  "669944D3BACEC1CF7AB8AA5AFC15D4CF3EF03D9990F93F0A491BB9242AEC4CB2",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/mid-scene-b-110s.bgr",
+                       "interval":  "mid-scene-b",
+                       "timestampSeconds":  110,
+                       "sha256":  "6E9F1A8AB71721AC146F4C70443A3E120DC93B78B0D64967F1C66957CA6D8D78",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/mid-scene-b-111s.bgr",
+                       "interval":  "mid-scene-b",
+                       "timestampSeconds":  111,
+                       "sha256":  "2BF0CCAD91C9A5D79402FB0AD6340CCC1F5F5536037DBEDBCEF1BDCF5561437F",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/mid-scene-b-112s.bgr",
+                       "interval":  "mid-scene-b",
+                       "timestampSeconds":  112,
+                       "sha256":  "C3DF8F73D653BD746716E7BEE5D24F0373F9C950FB8D7CC2BCE73B93B7DAF9F1",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/mid-scene-b-113s.bgr",
+                       "interval":  "mid-scene-b",
+                       "timestampSeconds":  113,
+                       "sha256":  "767C9DF9788D20A324075B18759AD9AC101AD67AE60A5C16EC3EE9BB9D85DB5A",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/mid-scene-b-114s.bgr",
+                       "interval":  "mid-scene-b",
+                       "timestampSeconds":  114,
+                       "sha256":  "F5E7BCA8C157D6B2E4E0202B9153D34CDC84D020238DCF6FCAF93175DA016B14",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/late-scene-a-145s.bgr",
+                       "interval":  "late-scene-a",
+                       "timestampSeconds":  145,
+                       "sha256":  "4DA299E36E75EF7A269F9A131F7E891B4C45404E8861B0998C5B8A514CCEE773",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/late-scene-a-146s.bgr",
+                       "interval":  "late-scene-a",
+                       "timestampSeconds":  146,
+                       "sha256":  "A343FEC01B6A0B03547E1E74614F33D49E40510785E811DACB6376FB855986E2",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/late-scene-a-147s.bgr",
+                       "interval":  "late-scene-a",
+                       "timestampSeconds":  147,
+                       "sha256":  "3F960A7D9D82E6A3EC4783936EC358DB9489DE4644EE4222914A644356459237",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/late-scene-a-148s.bgr",
+                       "interval":  "late-scene-a",
+                       "timestampSeconds":  148,
+                       "sha256":  "FDAFFC2115B980E59053FAC3AE13491E88385E9AE598107B3B9887CB749A0179",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/late-scene-a-149s.bgr",
+                       "interval":  "late-scene-a",
+                       "timestampSeconds":  149,
+                       "sha256":  "D24BEA9988A57F52F37AC3806E5A5241E9FF464AB7B282F65E27406E8F692EAD",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/late-scene-a-150s.bgr",
+                       "interval":  "late-scene-a",
+                       "timestampSeconds":  150,
+                       "sha256":  "B018BFCAB68C97340D6F548120E30ECFFDBAE7C421F98D8A051CAF5B45F9F6C4",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/late-scene-a-151s.bgr",
+                       "interval":  "late-scene-a",
+                       "timestampSeconds":  151,
+                       "sha256":  "52A5EA4DFCF4633A41BD438118373777B4BA11E01B474E47A1E4C147759586F8",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/late-scene-a-152s.bgr",
+                       "interval":  "late-scene-a",
+                       "timestampSeconds":  152,
+                       "sha256":  "3F960C0C35AE678D2A2EA5165822E41C1D2F884B919B877D73E7207DE0F663E9",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/late-scene-a-153s.bgr",
+                       "interval":  "late-scene-a",
+                       "timestampSeconds":  153,
+                       "sha256":  "BCE022C73395CA2C99F649FBFDAAD4B79D1716722381856F760616032835AF00",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/late-scene-a-154s.bgr",
+                       "interval":  "late-scene-a",
+                       "timestampSeconds":  154,
+                       "sha256":  "A1F7C8D5EC89759242A8ED7AA9F2135939DA8C04E5C049B46519D0AC0B0C355F",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/late-scene-b-185s.bgr",
+                       "interval":  "late-scene-b",
+                       "timestampSeconds":  185,
+                       "sha256":  "1D4216682855FE3B5F70EB0EE0042FB21F317EDA000010003B4AC71DAEF93A13",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/late-scene-b-186s.bgr",
+                       "interval":  "late-scene-b",
+                       "timestampSeconds":  186,
+                       "sha256":  "98BB72DB73EF603C9C9C97C3DA3ACC2DD360C66ECF6913EBDE4C2BDC8774F308",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/late-scene-b-187s.bgr",
+                       "interval":  "late-scene-b",
+                       "timestampSeconds":  187,
+                       "sha256":  "2C17216B4A2C6F878C4D592F2D19E11687B5AE09D75E163FA55EF6310BAF7396",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/late-scene-b-188s.bgr",
+                       "interval":  "late-scene-b",
+                       "timestampSeconds":  188,
+                       "sha256":  "6BE1FAFB0EA54B44FD9DA9ACA26C4C3877B507C6715B6CFA9DD1071D364186D4",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/late-scene-b-189s.bgr",
+                       "interval":  "late-scene-b",
+                       "timestampSeconds":  189,
+                       "sha256":  "12D512558477AC089C3AAFDB0DF3F6095C9858907CFDF1335E374337A3C53F6B",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/late-scene-b-190s.bgr",
+                       "interval":  "late-scene-b",
+                       "timestampSeconds":  190,
+                       "sha256":  "C7AFD2A8BF49A41F7B71284B7E487CF5F7738E55E03DC526CA7D3FC15EE824E4",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/late-scene-b-191s.bgr",
+                       "interval":  "late-scene-b",
+                       "timestampSeconds":  191,
+                       "sha256":  "F202357260FCB719348C92C7DF5BD48F01DD3F128D6730847B76280C15388BE1",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/late-scene-b-192s.bgr",
+                       "interval":  "late-scene-b",
+                       "timestampSeconds":  192,
+                       "sha256":  "F5D8773CDC494CBA9A69562F277D9638B3ED428B31B2A4E5F7C34D735A97F902",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/late-scene-b-193s.bgr",
+                       "interval":  "late-scene-b",
+                       "timestampSeconds":  193,
+                       "sha256":  "9FF8F2A0A21A074AA01BC0003F61F7F411D1E24A4C86F7E477C14D8467B8835B",
+                       "bytes":  691200
+                   },
+                   {
+                       "file":  ".playwright-mcp/pose-evaluation/late-scene-b-194s.bgr",
+                       "interval":  "late-scene-b",
+                       "timestampSeconds":  194,
+                       "sha256":  "23C682FB50CD34D34C5F44A1432F8A5D3A8DC5F504046D68EFCCBEE6FA3735C3",
+                       "bytes":  691200
+                   }
+               ]
+}

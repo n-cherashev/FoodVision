@@ -95,6 +95,7 @@ public sealed class BenchmarkRunner(IServiceProvider services, IOptions<Analysis
             var detector = inferenceRuntime.TableDetector;
             var pose = inferenceRuntime.PersonPose;
             var personDetector = inferenceRuntime.PersonDetector;
+            var rfdetrModel = inferenceRuntime.RfDetrKeypoint;
             // Model initialization alone does not execute CUDA kernels; keep warm-up
             // outside the measured run and do not start decoders until it finishes.
             using (await GpuInferenceGate.EnterInferenceAsync(cancellationToken))
@@ -107,16 +108,32 @@ public sealed class BenchmarkRunner(IServiceProvider services, IOptions<Analysis
                     workspace.Prepare(frame, 640, 360);
                     detector.Detect(workspace.TableInput, .1f, -1);
                     cancellationToken.ThrowIfCancellationRequested();
-                    var poses = pose.Detect(workspace.PoseInput, .08f, 0);
-                    cancellationToken.ThrowIfCancellationRequested();
-                    personDetector.Detect(workspace.PersonInput, poses);
-                    cancellationToken.ThrowIfCancellationRequested();
+                    if (rfdetrModel is not null && workspace.RfDetrKeypointInput is not null)
+                    {
+                        rfdetrModel.Detect(workspace.RfDetrKeypointInput);
+                        cancellationToken.ThrowIfCancellationRequested();
+                    }
+                    else if (pose is not null)
+                    {
+                        var poses = pose.Detect(workspace.PoseInput, .08f, 0);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (personDetector is not null && workspace.PersonInput is not null)
+                        {
+                            personDetector.Detect(workspace.PersonInput, poses);
+                            cancellationToken.ThrowIfCancellationRequested();
+                        }
+                    }
                 }, cancellationToken);
             }
             var started = Stopwatch.GetTimestamp();
             var startedAt = DateTimeOffset.UtcNow;
-            await Send(socket, new { type = "run-start", startedAt, appVersion = typeof(BenchmarkRunner).Assembly.GetName().Version?.ToString() ?? "unknown", streams = streamCount, sourceFps = videoInfo.Fps, durationSeconds = videoInfo.Duration, sourceResolution = $"{videoInfo.Width}x{videoInfo.Height}", videoFps = DeliveryFps, analyticsFps = _options.SamplingFramesPerSecond, gpuConcurrency = GpuInferenceGate.BenchmarkConcurrency, resolution = "640x360", model = Path.GetFileName(_options.PersonDetectionModelPath) + " + " + Path.GetFileName(_options.PersonPoseModelPath) + " + " + Path.GetFileName(_options.TableDetectionModelPath), cpu = "process CPU", memory = "process working set", gpu = "unavailable: NVIDIA telemetry tool is not installed", videoMemory = "unavailable: NVIDIA telemetry tool is not installed" }, cancellationToken);
-            var tasks = Enumerable.Range(1, streamCount).Select(id => ProcessStream(socket, id, path, detector, pose, personDetector, inferenceRuntime, view, started, cancellationToken)).ToArray();
+            var modelDescription = rfdetrModel is not null
+                ? Path.GetFileName(_options.RfdetrKeypointModelPath) + $" (RF-DETR, conf={_options.RfdetrKeypointConfidence:0.##}) + " + Path.GetFileName(_options.TableDetectionModelPath)
+                : personDetector is not null && !string.IsNullOrWhiteSpace(_options.PersonDetectionModelPath)
+                    ? Path.GetFileName(_options.PersonDetectionModelPath) + " + " + Path.GetFileName(_options.PersonPoseModelPath) + " + " + Path.GetFileName(_options.TableDetectionModelPath)
+                    : Path.GetFileName(_options.PersonPoseModelPath) + " + " + Path.GetFileName(_options.TableDetectionModelPath);
+            await Send(socket, new { type = "run-start", startedAt, appVersion = typeof(BenchmarkRunner).Assembly.GetName().Version?.ToString() ?? "unknown", streams = streamCount, sourceFps = videoInfo.Fps, durationSeconds = videoInfo.Duration, sourceResolution = $"{videoInfo.Width}x{videoInfo.Height}", videoFps = DeliveryFps, analyticsFps = _options.SamplingFramesPerSecond, gpuConcurrency = GpuInferenceGate.BenchmarkConcurrency, resolution = "640x360", model = modelDescription, cpu = "process CPU", memory = "process working set", gpu = "unavailable: NVIDIA telemetry tool is not installed", videoMemory = "unavailable: NVIDIA telemetry tool is not installed" }, cancellationToken);
+            var tasks = Enumerable.Range(1, streamCount).Select(id => ProcessStream(socket, id, path, detector, pose, personDetector, rfdetrModel, inferenceRuntime, view, started, cancellationToken)).ToArray();
             await Task.WhenAll(tasks);
             await Send(socket, new { type = "run-end", endedAt = DateTimeOffset.UtcNow, elapsedSeconds = (Stopwatch.GetTimestamp() - started) / (double)Stopwatch.Frequency }, cancellationToken);
         }
@@ -127,7 +144,7 @@ public sealed class BenchmarkRunner(IServiceProvider services, IOptions<Analysis
         }
     }
 
-    private async Task ProcessStream(WebSocket socket, int id, string path, YoloOnnxModel detector, YoloOnnxModel pose, PersonDetector personDetector, InferenceRuntime inferenceRuntime, ViewRange view, long runStarted, CancellationToken token)
+    private async Task ProcessStream(WebSocket socket, int id, string path, YoloOnnxModel detector, YoloOnnxModel? pose, PersonDetector? personDetector, RfDetrKeypointModel? rfdetrModel, InferenceRuntime inferenceRuntime, ViewRange view, long runStarted, CancellationToken token)
     {
         var start = DateTimeOffset.UtcNow;
         var process = new Process { StartInfo = new ProcessStartInfo(_options.FfmpegPath) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true } };
@@ -173,11 +190,32 @@ public sealed class BenchmarkRunner(IServiceProvider services, IOptions<Analysis
                     detections = detector.Detect(workspace.TableInput, .1f, -1);
                     var tableInferenceMs = (Stopwatch.GetTimestamp() - stageStart) * 1000d / Stopwatch.Frequency;
                     stageStart = Stopwatch.GetTimestamp();
-                    var poses = pose.Detect(workspace.PoseInput, .08f, 0);
-                    var poseInferenceMs = (Stopwatch.GetTimestamp() - stageStart) * 1000d / Stopwatch.Frequency;
-                    stageStart = Stopwatch.GetTimestamp();
-                    people = personDetector.Detect(workspace.PersonInput, poses);
-                    var personInferenceMs = (Stopwatch.GetTimestamp() - stageStart) * 1000d / Stopwatch.Frequency;
+                    double poseInferenceMs = 0;
+                    double personInferenceMs = 0;
+                    if (rfdetrModel is not null && workspace.RfDetrKeypointInput is not null)
+                    {
+                        people = rfdetrModel.Detect(workspace.RfDetrKeypointInput);
+                        poseInferenceMs = (Stopwatch.GetTimestamp() - stageStart) * 1000d / Stopwatch.Frequency;
+                    }
+                    else if (pose is not null)
+                    {
+                        var poses = pose.Detect(workspace.PoseInput, .08f, 0);
+                        poseInferenceMs = (Stopwatch.GetTimestamp() - stageStart) * 1000d / Stopwatch.Frequency;
+                        if (personDetector is not null && workspace.PersonInput is not null)
+                        {
+                            stageStart = Stopwatch.GetTimestamp();
+                            people = personDetector.Detect(workspace.PersonInput, poses);
+                            personInferenceMs = (Stopwatch.GetTimestamp() - stageStart) * 1000d / Stopwatch.Frequency;
+                        }
+                        else
+                        {
+                            people = poses;
+                        }
+                    }
+                    else
+                    {
+                        people = Array.Empty<Detection>();
+                    }
                     lock (statisticsSync)
                     {
                         objectDetections = detections.Count;

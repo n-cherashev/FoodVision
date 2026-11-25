@@ -7,8 +7,8 @@ services:
       - "8080:8080"
     environment:
       ASPNETCORE_URLS: http://+:8080
-      Analysis__PersonPoseModelPath: /app/models/yolo11x-pose.onnx
-      Analysis__PersonDetectionModelPath: /app/models/yolo26l-detect.onnx
+      Analysis__RfdetrKeypointModelPath: /app/models/rfdetr-keypoint-preview.onnx
+      Analysis__RfdetrKeypointConfidence: "0.40"
       Analysis__TableDetectionModelPath: /app/models/yolo11x.onnx
       Analysis__FfmpegPath: ffmpeg
       Analysis__FfprobePath: ffprobe

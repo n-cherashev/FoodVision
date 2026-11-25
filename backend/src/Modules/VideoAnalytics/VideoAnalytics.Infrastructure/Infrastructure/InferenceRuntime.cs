@@ -20,8 +20,9 @@ internal sealed class InferenceRuntime : IDisposable
     }
 
     public YoloOnnxModel TableDetector => _models.Value.TableDetector;
-    public YoloOnnxModel PersonPose => _models.Value.PersonPose;
-    public PersonDetector PersonDetector => _models.Value.PersonDetector;
+    public YoloOnnxModel? PersonPose => _models.Value.PersonPose;
+    public PersonDetector? PersonDetector => _models.Value.PersonDetector;
+    public RfDetrKeypointModel? RfDetrKeypoint => _models.Value.RfDetrKeypoint;
 
     public InferenceWorkspaceLease RentInput() => _models.Value.RentInput();
 
@@ -35,15 +36,30 @@ internal sealed class InferenceRuntime : IDisposable
         YoloOnnxModel? tableDetector = null;
         YoloOnnxModel? personPose = null;
         PersonDetector? personDetector = null;
+        RfDetrKeypointModel? rfdetrKeypoint = null;
         try
         {
             tableDetector = new YoloOnnxModel(_options.TableDetectionModelPath, _options.FrameSize, pose: false);
-            personPose = new YoloOnnxModel(_options.PersonPoseModelPath, _options.FrameSize, pose: true);
-            personDetector = new PersonDetector(_options.PersonDetectionModelPath);
-            return new ModelSet(tableDetector, personPose, personDetector, GpuInferenceGate.BenchmarkConcurrency);
+            if (!string.IsNullOrWhiteSpace(_options.RfdetrKeypointModelPath) && File.Exists(_options.RfdetrKeypointModelPath))
+            {
+                rfdetrKeypoint = new RfDetrKeypointModel(_options.RfdetrKeypointModelPath, _options.RfdetrKeypointConfidence);
+            }
+            else
+            {
+                if (!string.IsNullOrWhiteSpace(_options.PersonPoseModelPath) && File.Exists(_options.PersonPoseModelPath))
+                {
+                    personPose = new YoloOnnxModel(_options.PersonPoseModelPath, _options.FrameSize, pose: true);
+                }
+                if (!string.IsNullOrWhiteSpace(_options.PersonDetectionModelPath) && File.Exists(_options.PersonDetectionModelPath))
+                {
+                    personDetector = new PersonDetector(_options.PersonDetectionModelPath);
+                }
+            }
+            return new ModelSet(tableDetector, personPose, personDetector, rfdetrKeypoint, GpuInferenceGate.BenchmarkConcurrency);
         }
         catch
         {
+            rfdetrKeypoint?.Dispose();
             personDetector?.Dispose();
             personPose?.Dispose();
             tableDetector?.Dispose();
@@ -55,18 +71,20 @@ internal sealed class InferenceRuntime : IDisposable
     {
         private readonly ConcurrentBag<InferenceWorkspace> _inputs;
 
-        public ModelSet(YoloOnnxModel tableDetector, YoloOnnxModel personPose, PersonDetector personDetector, int concurrency)
+        public ModelSet(YoloOnnxModel tableDetector, YoloOnnxModel? personPose, PersonDetector? personDetector, RfDetrKeypointModel? rfdetrKeypoint, int concurrency)
         {
             TableDetector = tableDetector;
             PersonPose = personPose;
             PersonDetector = personDetector;
+            RfDetrKeypoint = rfdetrKeypoint;
             _inputs = new ConcurrentBag<InferenceWorkspace>(Enumerable.Range(0, concurrency)
-                .Select(_ => new InferenceWorkspace(tableDetector, personPose, personDetector)));
+                .Select(_ => new InferenceWorkspace(tableDetector, personPose, personDetector, rfdetrKeypoint is not null)));
         }
 
         public YoloOnnxModel TableDetector { get; }
-        public YoloOnnxModel PersonPose { get; }
-        public PersonDetector PersonDetector { get; }
+        public YoloOnnxModel? PersonPose { get; }
+        public PersonDetector? PersonDetector { get; }
+        public RfDetrKeypointModel? RfDetrKeypoint { get; }
 
         public InferenceWorkspaceLease RentInput()
         {
@@ -76,8 +94,9 @@ internal sealed class InferenceRuntime : IDisposable
 
         public void Dispose()
         {
-            PersonDetector.Dispose();
-            PersonPose.Dispose();
+            PersonDetector?.Dispose();
+            PersonPose?.Dispose();
+            RfDetrKeypoint?.Dispose();
             TableDetector.Dispose();
         }
     }
