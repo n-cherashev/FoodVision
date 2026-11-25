@@ -18,6 +18,7 @@ public static class TablePostgresChecks
         Console.WriteLine("Connecting to PostgreSQL for integration checks...");
         var options = new DbContextOptionsBuilder<TablesDbContext>()
             .UseNpgsql(connectionString, npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", TablesDbContext.Schema))
+            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
             .Options;
 
         try

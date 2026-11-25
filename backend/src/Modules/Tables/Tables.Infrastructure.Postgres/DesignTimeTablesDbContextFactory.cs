@@ -16,6 +16,7 @@ public sealed class DesignTimeTablesDbContextFactory : IDesignTimeDbContextFacto
             .UseNpgsql(
                 connectionString,
                 npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", TablesDbContext.Schema))
+            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
             .Options;
 
         return new TablesDbContext(options);
