@@ -7,6 +7,8 @@ using FoodVision.Api.Domain;
 using FoodVision.VideoAnalytics.Infrastructure.Postgres;
 using FoodVision.Tables.Infrastructure.Postgres;
 using FoodVision.Tables.Application;
+using FoodVision.Orders.Infrastructure.Postgres;
+using FoodVision.Orders.Application;
 using FoodVision.Shared.Framework.Database;
 using FoodVision.Shared.Core.Abstractions;
 
@@ -15,9 +17,11 @@ if (!string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("FoodVi
 {
     builder.Services.AddVideoAnalyticsPostgres(builder.Configuration);
     builder.Services.AddTablesPostgres(builder.Configuration);
+    builder.Services.AddOrdersPostgres(builder.Configuration);
 }
 builder.Services.AddVideoAnalyticsInference(builder.Configuration);
 builder.Services.AddTablesApplication();
+builder.Services.AddOrdersApplication();
 builder.Services.AddSingleton<IBenchmarkRunner, BenchmarkRunner>();
 builder.Services.AddHandlers(typeof(AnalyzeVideoHandler).Assembly);
 builder.Services.AddControllers();

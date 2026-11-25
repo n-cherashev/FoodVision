@@ -32,6 +32,7 @@ internal static class ArchitectureChecks
             if (source.Contains("FoodVision.Api", StringComparison.Ordinal) ||
                 source.Contains("FoodVision.VideoAnalytics", StringComparison.Ordinal) ||
                 source.Contains("FoodVision.Tables", StringComparison.Ordinal) ||
+                source.Contains("FoodVision.Orders", StringComparison.Ordinal) ||
                 source.Contains("FoodVision.Benchmark", StringComparison.Ordinal))
                 throw new Exception($"Shared project contains module-specific code: {Path.GetRelativePath(repositoryRoot, sourcePath)}");
         }

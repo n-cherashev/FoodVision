@@ -33,3 +33,17 @@ public sealed class GetTableEventsHandler(ITableSessionRepository repository)
         return Result.Success<IReadOnlyList<TableEventDto>, string>(events.Select(e => e.ToDto()).ToList());
     }
 }
+
+public sealed record GetSessionTablesQuery(string SessionId) : ICommand;
+
+public sealed class GetSessionTablesHandler(ITableSessionRepository repository)
+    : ICommandHandler<IReadOnlyList<TableSessionStateDto>, GetSessionTablesQuery>
+{
+    public async Task<Result<IReadOnlyList<TableSessionStateDto>, string>> Handle(
+        GetSessionTablesQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        var tables = await repository.GetSessionTables(query.SessionId, cancellationToken);
+        return Result.Success<IReadOnlyList<TableSessionStateDto>, string>(tables.Select(t => t.ToDto()).ToList());
+    }
+}

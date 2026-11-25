@@ -2,7 +2,12 @@ using CSharpFunctionalExtensions;
 using FoodVision.Api.Domain;
 using FoodVision.Api.Features.Analysis;
 using FoodVision.Api.Infrastructure;
+using FoodVision.Orders.Application;
+using FoodVision.Orders.Application.DTOs;
+using FoodVision.Orders.Application.Features;
+using FoodVision.Orders.Application.Interfaces;
 using FoodVision.Orders.Contracts;
+using FoodVision.Orders.Domain;
 using FoodVision.Shared.Core.Abstractions;
 using FoodVision.Tables.Application.Features;
 using FoodVision.Tables.Application.Interfaces;
@@ -17,11 +22,14 @@ internal static class HandlerChecks
     {
         var analyzer = new FakeAnalyzer();
         var tableRepo = new FakeTableSessionRepository();
+        var ordersRepo = new FakeOrdersRepository();
         var services = new ServiceCollection();
         services.AddSingleton<IVideoAnalyzer>(analyzer);
         services.AddSingleton<ITableSessionRepository>(tableRepo);
+        services.AddSingleton<IOrdersRepository>(ordersRepo);
         services.AddHandlers(typeof(AnalyzeVideoHandler).Assembly);
         services.AddHandlers(typeof(ConfirmTableCleaningHandler).Assembly);
+        services.AddOrdersApplication();
 
         using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         using var scope = provider.CreateScope();
@@ -50,6 +58,17 @@ internal static class HandlerChecks
             new("sess-1", "table-1", 10, DateTimeOffset.UtcNow));
         if (cleanFail.IsSuccess)
             throw new Exception("ConfirmTableCleaningCommand should fail when table is occupied");
+
+        // Verify Orders handlers dispatching
+        var openOrderResult = await dispatcher.Send<OrderDetailsDto, OpenOrderCommand>(
+            new("ord-h1", "table-1", "rest-1", "101", "sess-1", "waiter-1", "Иван", 2, 10.0, DateTimeOffset.UtcNow));
+        if (openOrderResult.IsFailure || openOrderResult.Value.Status != OrderStatus.Open)
+            throw new Exception($"OpenOrderCommand was not dispatched correctly: {openOrderResult.Error}");
+
+        var addItemResult = await dispatcher.Send<OrderDetailsDto, AddOrderItemCommand>(
+            new("ord-h1", "item-1", "Суп", "Первые блюда", 1, 300, 1, 15.0, DateTimeOffset.UtcNow));
+        if (addItemResult.IsFailure || addItemResult.Value.TotalAmount != 300)
+            throw new Exception($"AddOrderItemCommand was not dispatched correctly: {addItemResult.Error}");
 
         Console.WriteLine("Handler registration and dispatch checks passed.");
     }
@@ -103,6 +122,39 @@ internal static class HandlerChecks
             _events.AddRange(state.UncommittedEvents);
             state.ClearUncommittedEvents();
             return Task.FromResult(Result.Success<TableSessionState, string>(state));
+        }
+    }
+
+    private sealed class FakeOrdersRepository : IOrdersRepository
+    {
+        private readonly Dictionary<string, Order> _orders = new();
+
+        public Task<Result<Order, string>> GetById(string orderId, CancellationToken cancellationToken = default)
+        {
+            if (_orders.TryGetValue(orderId, out var o))
+                return Task.FromResult(Result.Success<Order, string>(o));
+            return Task.FromResult(Result.Failure<Order, string>("Not found"));
+        }
+
+        public Task<IReadOnlyList<Order>> GetByTable(string tableId, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyList<Order>>(_orders.Values.Where(o => o.TableId == tableId).ToList());
+        }
+
+        public Task<IReadOnlyList<Order>> GetBySession(string sessionId, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyList<Order>>(_orders.Values.Where(o => o.SessionId == sessionId).ToList());
+        }
+
+        public Task<IReadOnlyList<Order>> GetActiveOrders(string restaurantId, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyList<Order>>(_orders.Values.Where(o => o.RestaurantId == restaurantId && o.Status != OrderStatus.Closed && o.Status != OrderStatus.Cancelled).ToList());
+        }
+
+        public Task<Result<Order, string>> Save(Order order, CancellationToken cancellationToken = default)
+        {
+            _orders[order.OrderId] = order;
+            return Task.FromResult(Result.Success<Order, string>(order));
         }
     }
 }

@@ -78,5 +78,7 @@ Console.WriteLine("Timeline and layout scenarios passed.");
 
 TableDomainChecks.Run();
 await TablePostgresChecks.Run();
+OrderDomainChecks.Run();
+await OrderPostgresChecks.Run();
 await HandlerChecks.Run();
 ArchitectureChecks.Run();

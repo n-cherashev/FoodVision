@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="CSharpFunctionalExtensions" Version="3.7.0" />
+    <ProjectReference Include="../Orders.Domain/Orders.Domain.csproj" />
+    <ProjectReference Include="../Orders.Contracts/Orders.Contracts.csproj" />
+    <ProjectReference Include="../../Tables/Tables.Application/Tables.Application.csproj" />
+    <ProjectReference Include="../../../Shared/Shared.Core/Shared.Core.csproj" />
+  </ItemGroup>
+</Project>

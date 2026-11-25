@@ -10,6 +10,9 @@
     <ProjectReference Include="../Modules/Tables/Tables.Application/Tables.Application.csproj" />
     <ProjectReference Include="../Modules/Tables/Tables.Infrastructure.Postgres/Tables.Infrastructure.Postgres.csproj" />
     <ProjectReference Include="../Modules/Orders/Orders.Contracts/Orders.Contracts.csproj" />
+    <ProjectReference Include="../Modules/Orders/Orders.Domain/Orders.Domain.csproj" />
+    <ProjectReference Include="../Modules/Orders/Orders.Application/Orders.Application.csproj" />
+    <ProjectReference Include="../Modules/Orders/Orders.Infrastructure.Postgres/Orders.Infrastructure.Postgres.csproj" />
     <ProjectReference Include="../Modules/VideoAnalytics/VideoAnalytics.Infrastructure.Postgres/VideoAnalytics.Infrastructure.Postgres.csproj" />
   </ItemGroup>
 </Project>

@@ -1,6 +1,9 @@
 <Solution>
   <Project Path="src/FoodVision.App/FoodVision.App.csproj" />
   <Project Path="src/Modules/Orders/Orders.Contracts/Orders.Contracts.csproj" />
+  <Project Path="src/Modules/Orders/Orders.Domain/Orders.Domain.csproj" />
+  <Project Path="src/Modules/Orders/Orders.Application/Orders.Application.csproj" />
+  <Project Path="src/Modules/Orders/Orders.Infrastructure.Postgres/Orders.Infrastructure.Postgres.csproj" />
   <Project Path="src/Modules/Tables/Tables.Contracts/Tables.Contracts.csproj" />
   <Project Path="src/Modules/Tables/Tables.Domain/Tables.Domain.csproj" />
   <Project Path="src/Modules/Tables/Tables.Application/Tables.Application.csproj" />
