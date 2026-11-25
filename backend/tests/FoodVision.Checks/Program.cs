@@ -1,5 +1,6 @@
 using FoodVision.Api.Domain;
 using FoodVision.Api.Utilites;
+using FoodVision.Checks;
 
 var table = new Box(40, 40, 20, 20);
 var zone = new Box(20, 20, 60, 60);
@@ -74,5 +75,8 @@ if (TimelineCalculations.BuildSegments([], 1, 10).Count != 0)
 if (BoundingBox.Create(.9, .1, .2, .2).IsSuccess || BoundingBox.Create(.1, .1, .2, .2).IsFailure)
     throw new Exception("Table bounds must stay within the normalized frame");
 Console.WriteLine("Timeline and layout scenarios passed.");
+
+TableDomainChecks.Run();
+await TablePostgresChecks.Run();
 await HandlerChecks.Run();
 ArchitectureChecks.Run();

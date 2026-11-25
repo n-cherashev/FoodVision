@@ -5,13 +5,19 @@ using Microsoft.AspNetCore.Http.Features;
 using FoodVision.Api.Benchmark;
 using FoodVision.Api.Domain;
 using FoodVision.VideoAnalytics.Infrastructure.Postgres;
+using FoodVision.Tables.Infrastructure.Postgres;
+using FoodVision.Tables.Application;
 using FoodVision.Shared.Framework.Database;
 using FoodVision.Shared.Core.Abstractions;
 
 var builder = WebApplication.CreateBuilder(args);
 if (!string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("FoodVision")))
+{
     builder.Services.AddVideoAnalyticsPostgres(builder.Configuration);
+    builder.Services.AddTablesPostgres(builder.Configuration);
+}
 builder.Services.AddVideoAnalyticsInference(builder.Configuration);
+builder.Services.AddTablesApplication();
 builder.Services.AddSingleton<IBenchmarkRunner, BenchmarkRunner>();
 builder.Services.AddHandlers(typeof(AnalyzeVideoHandler).Assembly);
 builder.Services.AddControllers();

@@ -8,6 +8,8 @@
     <ProjectReference Include="../../src/Modules/Tables/Tables.Application/Tables.Application.csproj" />
     <ProjectReference Include="../../src/Modules/Tables/Tables.Domain/Tables.Domain.csproj" />
     <ProjectReference Include="../../src/Modules/Tables/Tables.Contracts/Tables.Contracts.csproj" />
+    <ProjectReference Include="../../src/Modules/Tables/Tables.Infrastructure.Postgres/Tables.Infrastructure.Postgres.csproj" />
+    <ProjectReference Include="../../src/Modules/Orders/Orders.Contracts/Orders.Contracts.csproj" />
     <ProjectReference Include="../../src/Modules/VideoAnalytics/VideoAnalytics.Application/VideoAnalytics.Application.csproj" />
   </ItemGroup>
 </Project>
