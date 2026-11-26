@@ -154,8 +154,14 @@ i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }.occu
 .orders-setup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 20px 0; align-items: start; }
 @media (max-width: 900px) { .orders-setup-grid { grid-template-columns: 1fr; } }
 .orders-setup-video-col { display: flex; flex-direction: column; gap: 8px; }
-.video-time-indicator { font-size: 0.85rem; color: #bdd0c9; padding: 6px 10px; background: #06110e; border-radius: 6px; }
+.orders-setup-video-col .table-marker { border-color: #a9e6be; background: rgba(169, 230, 190, 0.08); transition: all 0.15s; }
+.orders-setup-video-col .table-marker:hover { border-color: #d9fff0; background: rgba(217, 255, 240, 0.18); transform: scale(1.01); }
+.orders-setup-video-col .table-marker.selected-setup-table { border-color: #f0c765; background: rgba(240, 199, 101, 0.22); box-shadow: 0 0 16px rgba(240, 199, 101, 0.6); z-index: 5; }
+.orders-setup-video-col .table-marker.selected-setup-table span { background: #f0c765; color: #10241f; font-weight: 800; }
+.table-order-count-badge { display: block; font-size: 0.68rem; background: #10241f; color: #a9e6be; border-radius: 3px; padding: 1px 4px; margin-top: 2px; }
+.video-time-indicator { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: #bdd0c9; padding: 8px 12px; background: #06110e; border-radius: 6px; }
 .video-time-indicator strong { color: #a9e6be; }
+.hint-text { font-size: 0.78rem; color: #9bd4bb; }
 .orders-setup-form-col { display: flex; flex-direction: column; gap: 16px; }
 .input-with-button { display: flex; gap: 8px; align-items: center; }
 .input-with-button input { flex: 1; }

@@ -103,7 +103,7 @@ export function OrdersSetup({
         заказа стол освободится только тогда, когда за ним <strong>не останется посетителей</strong> (анализируется таймфрейм видео).
       </p>
 
-      {/* Video preview for locating order moments */}
+      {/* Video preview for locating order moments with interactive table markers */}
       <div className="orders-setup-grid">
         <div className="orders-setup-video-col">
           <div className="video-frame">
@@ -114,9 +114,42 @@ export function OrdersSetup({
               preload="metadata"
               onTimeUpdate={handleTimeUpdate}
             />
+            <div className="table-overlay">
+              {tables.map((table, index) => {
+                const isSelected = selectedTableId === table.id;
+                const tableOrders = orders.filter((o) => o.tableId === table.id);
+
+                return (
+                  <div
+                    key={table.id}
+                    className={`table-marker ${isSelected ? "selected-setup-table" : ""}`}
+                    style={{
+                      left: `${table.bounds.x * 100}%`,
+                      top: `${table.bounds.y * 100}%`,
+                      width: `${table.bounds.width * 100}%`,
+                      height: `${table.bounds.height * 100}%`,
+                      cursor: "pointer",
+                      pointerEvents: "auto",
+                    }}
+                    onClick={() => setSelectedTableId(table.id)}
+                    title={`Кликните, чтобы выбрать Стол ${index + 1}`}
+                  >
+                    <span>
+                      Стол {index + 1}
+                      {tableOrders.length > 0 && (
+                        <strong className="table-order-count-badge">
+                          {tableOrders.length} {tableOrders.length === 1 ? "заказ" : "заказа"}
+                        </strong>
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
           <div className="video-time-indicator">
             <span>Текущий кадр: <strong>{formatTime(videoTime)}</strong> ({videoTime.toFixed(1)} сек)</span>
+            <span className="hint-text">💡 Кликните по столу на видео для выбора</span>
           </div>
         </div>
 
