@@ -69,7 +69,8 @@ public sealed class AnalysisController(IDispatcher dispatcher) : ControllerBase
                 {
                     table.Id,
                     table.Bounds,
-                    Segments = MapVisualSegments(table.Segments)
+                    Segments = MapVisualSegments(table.Segments),
+                    table.ServiceMetrics
                 })
             });
         }

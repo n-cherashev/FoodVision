@@ -109,6 +109,45 @@ if (BoundingBox.Create(.9, .1, .2, .2).IsSuccess || BoundingBox.Create(.1, .1, .
     throw new Exception("Table bounds must stay within the normalized frame");
 Console.WriteLine("Timeline and layout scenarios passed.");
 
+// Service interaction scenarios
+var tracker = new ServiceInteractionTracker();
+// 1. Brief passerby (3 seconds)
+tracker.Update(10, true);
+tracker.Update(11, true);
+tracker.Update(12, true);
+tracker.Update(13, false);
+tracker.Update(15, false);
+
+// 2. Real waiter visit (7 seconds)
+tracker.Update(20, true);
+tracker.Update(21, true);
+tracker.Update(22, true);
+tracker.Update(23, true);
+tracker.Update(24, true);
+tracker.Update(25, true);
+tracker.Update(26, true);
+tracker.Update(27, false);
+tracker.Update(29, false);
+
+tracker.Finish(40);
+
+var serviceSegments = new List<TimeSegment>
+{
+    TimeSegment.Create(0, 5, TableState.Available).Value,
+    TimeSegment.Create(5, 35, TableState.Occupied).Value
+};
+var serviceMetrics = tracker.BuildMetrics(serviceSegments, manualOrderStartSeconds: null);
+if (serviceMetrics.TotalApproachesCount != 1)
+    throw new Exception($"Expected 1 approach, got {serviceMetrics.TotalApproachesCount}");
+if (serviceMetrics.Approaches[0].DurationSeconds < 5.9)
+    throw new Exception($"Approach duration expected >= 6s, got {serviceMetrics.Approaches[0].DurationSeconds}");
+if (Math.Abs(serviceMetrics.TimeToFirstContactSeconds!.Value - 15.0) > 0.5)
+    throw new Exception($"TimeToFirstContact expected ~15s (20s - 5s), got {serviceMetrics.TimeToFirstContactSeconds}");
+if (serviceMetrics.IsFirstContactSlaViolated)
+    throw new Exception("SLA should not be violated under 5 minutes");
+
+Console.WriteLine("Service interaction scenarios passed.");
+
 TableDomainChecks.Run();
 await TablePostgresChecks.Run();
 OrderDomainChecks.Run();

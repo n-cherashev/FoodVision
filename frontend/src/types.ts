@@ -13,10 +13,27 @@ export interface StateSegment {
   state: TableState;
 }
 
+export interface ServiceApproach {
+  startSeconds: number;
+  endSeconds: number;
+  durationSeconds: number;
+}
+
+export interface TableServiceMetrics {
+  firstSeatedSeconds?: number | null;
+  firstContactSeconds?: number | null;
+  timeToFirstContactSeconds?: number | null;
+  isFirstContactSlaViolated: boolean;
+  totalApproachesCount: number;
+  approaches: ServiceApproach[];
+  totalVisitDurationSeconds?: number | null;
+}
+
 export interface DetectedTable {
   id: string;
   bounds: Bounds;
   segments: StateSegment[];
+  serviceMetrics?: TableServiceMetrics;
 }
 
 export interface TableConfiguration {

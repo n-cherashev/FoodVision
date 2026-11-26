@@ -49,6 +49,7 @@ export function Timeline({ table, index, duration, orders = [], onSeek }: Timeli
   const safeDuration = duration || 1;
   const tableOrders = orders.filter((o) => o.tableId === table.id);
   const visualSegments = useMemo(() => normalizeVisualSegments(table.segments), [table.segments]);
+  const service = table.serviceMetrics;
 
   return (
     <article className="timeline">
@@ -59,6 +60,33 @@ export function Timeline({ table, index, duration, orders = [], onSeek }: Timeli
             <span className="table-orders-badge">
               {tableOrders.length} {tableOrders.length === 1 ? "заказ" : "заказа"}
             </span>
+          )}
+          {service && (
+            <>
+              <span className="service-badge" title="Количество зафиксированных подходов официанта">
+                🤵 {service.totalApproachesCount} {formatApproaches(service.totalApproachesCount)}
+              </span>
+              {service.firstSeatedSeconds != null && (
+                <>
+                  {service.timeToFirstContactSeconds != null ? (
+                    <span
+                      className={`sla-badge ${service.isFirstContactSlaViolated ? "sla-violation" : "sla-ok"}`}
+                      title={`Посадка: ${formatTime(service.firstSeatedSeconds)}, 1-й подход официанта: ${formatTime(service.firstContactSeconds ?? 0)}`}
+                    >
+                      ⏱️ 1-й контакт: {formatTime(service.timeToFirstContactSeconds)}
+                    </span>
+                  ) : service.isFirstContactSlaViolated ? (
+                    <span className="sla-badge sla-violation" title="Официант не подошел более чем за 5 минут!">
+                      ⚠️ SLA &gt;5 мин
+                    </span>
+                  ) : (
+                    <span className="sla-badge sla-waiting" title="Ожидание первого подхода официанта">
+                      ⏱️ Ожидание
+                    </span>
+                  )}
+                </>
+              )}
+            </>
           )}
         </div>
         <span>{table.id}</span>
@@ -76,6 +104,25 @@ export function Timeline({ table, index, duration, orders = [], onSeek }: Timeli
             onClick={() => onSeek(segment.startSeconds)}
           >
             <span className="sr-only">{labels[segment.state] || labels.available}</span>
+          </button>
+        ))}
+
+        {/* Waiter Approach Pins on Timeline */}
+        {service?.approaches.map((approach, appIdx) => (
+          <button
+            type="button"
+            key={`approach-pin-${approach.startSeconds}-${appIdx}`}
+            className="timeline-pin waiter-pin"
+            style={{
+              left: `${Math.min(99, (approach.startSeconds / safeDuration) * 100)}%`,
+            }}
+            title={`🤵 Подход официанта: ${formatTime(approach.startSeconds)}–${formatTime(approach.endSeconds)} (${Math.round(approach.durationSeconds)} с)`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSeek(approach.startSeconds);
+            }}
+          >
+            🤵
           </button>
         ))}
 
@@ -168,6 +215,18 @@ export function Timeline({ table, index, duration, orders = [], onSeek }: Timeli
           </button>
         ))}
 
+        {/* Waiter approaches summary tags */}
+        {service?.approaches.map((app, appIdx) => (
+          <button
+            key={`app-chip-${app.startSeconds}-${appIdx}`}
+            className="service-detail-chip"
+            onClick={() => onSeek(app.startSeconds)}
+            title={`Перейти к подходу персонала (${Math.round(app.durationSeconds)} с)`}
+          >
+            🤵 Подход #{appIdx + 1}: {formatTime(app.startSeconds)} ({Math.round(app.durationSeconds)} с)
+          </button>
+        ))}
+
         {/* Orders summary tags */}
         {tableOrders.map((order) => (
           <button
@@ -181,6 +240,15 @@ export function Timeline({ table, index, duration, orders = [], onSeek }: Timeli
       </div>
     </article>
   );
+}
+
+function formatApproaches(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod100 >= 11 && mod100 <= 19) return "подходов";
+  if (mod10 === 1) return "подход";
+  if (mod10 >= 2 && mod10 <= 4) return "подхода";
+  return "подходов";
 }
 
 function formatTime(seconds: number): string {

@@ -132,6 +132,29 @@ internal sealed class VideoAnalyzer(InferenceRuntime inferenceRuntime, IOptions<
                                 assignedPeople.Ambiguous[tableIndex],
                                 hasActiveOrder);
                             table.Samples.Add((seconds, state));
+
+                            var isOccupied = state is TableState.Occupied or TableState.OccupiedWithItems;
+                            var standingPersonNear = false;
+                            if (isOccupied)
+                            {
+                                var tableDim = Math.Max(table.Bounds.Width, table.Bounds.Height);
+                                foreach (var person in people)
+                                {
+                                    if (person.Seated) continue;
+                                    var dist = DistanceToTable(person.Box, table.Bounds);
+                                    var inInteractionZone = dist <= tableDim * 0.65f || Geometry.Overlaps(person.Box, table.Bounds);
+                                    if (inInteractionZone)
+                                    {
+                                        var inSeatingZone = table.SeatingZones.Any(zone => Geometry.IoU(person.Box, zone) >= 0.35f);
+                                        if (!inSeatingZone)
+                                        {
+                                            standingPersonNear = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            table.ServiceTracker.Update(seconds, standingPersonNear);
                         }
                     }
                     frameIndex++;
@@ -145,13 +168,20 @@ internal sealed class VideoAnalyzer(InferenceRuntime inferenceRuntime, IOptions<
             if (frameIndex == 0) throw new InvalidOperationException("В видео не найдено ни одного кадра.");
 
             var videoDuration = duration > 0 ? duration : frameIndex * frameDuration;
+            foreach (var track in tableTracks)
+            {
+                track.ServiceTracker.Finish(videoDuration);
+            }
+
             var tables = tableTracks.Select(track =>
             {
                 var boundsResult = BoundingBox.Create(track.Bounds.X / width, track.Bounds.Y / height,
                     track.Bounds.Width / width, track.Bounds.Height / height);
                 if (boundsResult.IsFailure) throw new InvalidDataException(boundsResult.Error);
-                var tableResult = TableAnalysis.Create(track.Id, boundsResult.Value,
-                    TimelineCalculations.BuildSegments(track.Samples, frameDuration, videoDuration));
+                var segments = TimelineCalculations.BuildSegments(track.Samples, frameDuration, videoDuration);
+                var order = orders?.FirstOrDefault(o => string.Equals(o.TableId, track.Id, StringComparison.OrdinalIgnoreCase));
+                var serviceMetrics = track.ServiceTracker.BuildMetrics(segments, order?.StartSeconds);
+                var tableResult = TableAnalysis.Create(track.Id, boundsResult.Value, segments, serviceMetrics);
                 if (tableResult.IsFailure) throw new InvalidDataException(tableResult.Error);
                 return tableResult.Value;
             }).ToArray();
@@ -210,12 +240,22 @@ internal sealed class VideoAnalyzer(InferenceRuntime inferenceRuntime, IOptions<
         return true;
     }
 
+    private static float DistanceToTable(Box person, Box table)
+    {
+        var x = person.X + person.Width / 2;
+        var y = person.Y + person.Height / 2;
+        var dx = Math.Max(0, Math.Max(table.X - x, x - (table.X + table.Width)));
+        var dy = Math.Max(0, Math.Max(table.Y - y, y - (table.Y + table.Height)));
+        return MathF.Sqrt(dx * dx + dy * dy);
+    }
+
     private sealed class TableTrack(string id, Box bounds, IReadOnlyList<Box> seatingZones)
     {
         public string Id { get; } = id;
         public Box Bounds { get; } = bounds;
         public IReadOnlyList<Box> SeatingZones { get; } = seatingZones;
         public SeatingAnalysis Seating { get; } = new(bounds, seatingZones, releaseGracePeriod: 10.0);
+        public ServiceInteractionTracker ServiceTracker { get; } = new();
         public List<(double Time, TableState State)> Samples { get; } = [];
     }
 }

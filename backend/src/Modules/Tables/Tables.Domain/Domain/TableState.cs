@@ -38,21 +38,42 @@ public sealed class TimeSegment
     }
 }
 
+public sealed record ServiceApproach(double StartSeconds, double EndSeconds)
+{
+    public double DurationSeconds => Math.Max(0, Math.Round(EndSeconds - StartSeconds, 1));
+}
+
+public sealed record TableServiceMetrics(
+    double? FirstSeatedSeconds,
+    double? FirstContactSeconds,
+    double? TimeToFirstContactSeconds,
+    bool IsFirstContactSlaViolated,
+    int TotalApproachesCount,
+    IReadOnlyList<ServiceApproach> Approaches,
+    double? TotalVisitDurationSeconds);
+
 public sealed class TableAnalysis
 {
-    private TableAnalysis(string id, BoundingBox bounds, IReadOnlyList<TimeSegment> segments) => (Id, Bounds, Segments) = (id, bounds, segments);
+    private TableAnalysis(string id, BoundingBox bounds, IReadOnlyList<TimeSegment> segments, TableServiceMetrics? serviceMetrics = null) =>
+        (Id, Bounds, Segments, ServiceMetrics) = (id, bounds, segments, serviceMetrics);
+
     public string Id { get; }
     public BoundingBox Bounds { get; }
     public IReadOnlyList<TimeSegment> Segments { get; }
+    public TableServiceMetrics? ServiceMetrics { get; }
 
-    public static Result<TableAnalysis, string> Create(string id, BoundingBox bounds, IReadOnlyList<TimeSegment> segments)
+    public static Result<TableAnalysis, string> Create(
+        string id,
+        BoundingBox bounds,
+        IReadOnlyList<TimeSegment> segments,
+        TableServiceMetrics? serviceMetrics = null)
     {
         if (string.IsNullOrWhiteSpace(id)) return Result.Failure<TableAnalysis, string>("У стола должен быть идентификатор.");
         if (segments.Count == 0) return Result.Failure<TableAnalysis, string>("Для стола нужен хотя бы один временной интервал.");
         for (var index = 1; index < segments.Count; index++)
             if (segments[index].StartSeconds < segments[index - 1].EndSeconds)
                 return Result.Failure<TableAnalysis, string>("Временные интервалы стола не должны перекрываться.");
-        return Result.Success<TableAnalysis, string>(new TableAnalysis(id, bounds, segments));
+        return Result.Success<TableAnalysis, string>(new TableAnalysis(id, bounds, segments, serviceMetrics));
     }
 }
 
