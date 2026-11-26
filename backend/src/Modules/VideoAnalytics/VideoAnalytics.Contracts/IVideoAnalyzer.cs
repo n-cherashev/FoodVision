@@ -6,5 +6,13 @@ namespace FoodVision.Api.Infrastructure;
 public interface IVideoAnalyzer
 {
     Task<IReadOnlyList<TableConfiguration>> ProposeTables(IFormFile video, CancellationToken cancellationToken);
-    Task<VideoAnalysis> Analyze(IFormFile video, IReadOnlyList<TableConfiguration> tables, CancellationToken cancellationToken);
+    Task<VideoAnalysis> Analyze(
+        IFormFile video,
+        IReadOnlyList<TableConfiguration> tables,
+        IReadOnlyList<TableOrderInterval>? orders,
+        CancellationToken cancellationToken);
+    Task<VideoAnalysis> Analyze(
+        IFormFile video,
+        IReadOnlyList<TableConfiguration> tables,
+        CancellationToken cancellationToken) => Analyze(video, tables, null, cancellationToken);
 }

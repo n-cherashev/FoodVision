@@ -1,18 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { analyzeVideo, getOrdersBySession, prepareTables } from "./api";
 import { SetupEditor } from "./components/SetupEditor";
+import { OrdersSetup } from "./components/OrdersSetup";
 import { Timeline } from "./components/Timeline";
 import { UploadPanel } from "./components/UploadPanel";
 import { VideoViewer } from "./components/VideoViewer";
 import { BenchmarkPanel } from "./components/BenchmarkPanel";
 import { OrdersPanel } from "./components/OrdersPanel";
-import type { AnalysisResult, OrderDetails, TableConfiguration } from "./types";
+import type { AnalysisResult, OrderDetails, TableConfiguration, TableOrderInterval } from "./types";
+
+type WorkflowStep = "upload" | "layout" | "orders" | "results";
 
 export default function App() {
   const [file, setFile] = useState<File | null>(null);
   const [source, setSource] = useState<string | null>(null);
   const [tables, setTables] = useState<TableConfiguration[] | null>(null);
+  const [ordersToAnalyze, setOrdersToAnalyze] = useState<TableOrderInterval[]>([]);
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [step, setStep] = useState<WorkflowStep>("upload");
   const [sessionId, setSessionId] = useState<string>(() => `sess-${Date.now().toString(36)}`);
   const [orders, setOrders] = useState<OrderDetails[]>([]);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -44,8 +49,10 @@ export default function App() {
     setTables(null);
     setResult(null);
     setOrders([]);
+    setOrdersToAnalyze([]);
     setCurrentTime(0);
     setError(null);
+    setStep("upload");
     const nextSessionId = `sess-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
     setSessionId(nextSessionId);
     setSource((previous) => {
@@ -67,15 +74,20 @@ export default function App() {
   function propose() {
     if (!file) return;
     setResult(null);
-    void run(async signal => setTables(await prepareTables(file, signal)));
+    void run(async signal => {
+      const proposed = await prepareTables(file, signal);
+      setTables(proposed);
+      setStep("layout");
+    });
   }
 
-  function analyze() {
+  function runAnalysis() {
     if (!file || !tables?.length) return;
     setResult(null);
     void run(async signal => {
-      const analysis = await analyzeVideo(file, tables, signal);
+      const analysis = await analyzeVideo(file, tables, ordersToAnalyze, signal, sessionId);
       setResult(analysis);
+      setStep("results");
     });
   }
 
@@ -98,11 +110,48 @@ export default function App() {
         <button className={page === "benchmark" ? "selected" : ""} onClick={() => setPage("benchmark")}>Бенчмарк</button>
       </nav>
       {page === "benchmark" ? <BenchmarkPanel /> : <>
-      <UploadPanel file={file} loading={loading} prepared={tables !== null} analyzing={result !== null} canSubmit={tables === null || tables.length > 0} onFileChange={selectFile} onSubmit={tables === null ? propose : analyze} />
+      <UploadPanel
+        file={file}
+        loading={loading}
+        prepared={tables !== null}
+        analyzing={step === "results"}
+        canSubmit={step === "upload" ? Boolean(file) : Boolean(tables?.length)}
+        onFileChange={selectFile}
+        onSubmit={step === "upload" ? propose : () => setStep("orders")}
+      />
+
       {error && <p className="message error" role="alert">{error}</p>}
-      {loading && <p className="message loading" role="status">{tables === null ? "Ищем столы на видео. Это может занять несколько минут." : "Анализируем подтверждённые столы и зоны посадки."}</p>}
-      {tables && source && !result && !loading && <SetupEditor source={source} tables={tables} onChange={changeTables} />}
-      {result && source && (
+      {loading && <p className="message loading" role="status">
+        {step === "upload"
+          ? "Ищем столы на видео. Это может занять некоторое время."
+          : "Анализируем видео с учетом разметки столов и интервалов заказов..."}
+      </p>}
+
+      {/* Step 1: Layout editing */}
+      {step === "layout" && tables && source && !loading && (
+        <SetupEditor
+          source={source}
+          tables={tables}
+          onChange={changeTables}
+          onNext={() => setStep("orders")}
+        />
+      )}
+
+      {/* Step 2: Pre-analysis Orders input */}
+      {step === "orders" && tables && source && !loading && (
+        <OrdersSetup
+          source={source}
+          tables={tables}
+          orders={ordersToAnalyze}
+          loading={loading}
+          onChange={setOrdersToAnalyze}
+          onBack={() => setStep("layout")}
+          onSubmit={runAnalysis}
+        />
+      )}
+
+      {/* Step 3: Analysis Results */}
+      {step === "results" && result && source && (
         <section className="results" aria-labelledby="results-heading">
           <div className="section-heading">
             <div><p className="eyebrow">Результат анализа</p><h2 id="results-heading">План видео</h2></div>
@@ -115,7 +164,9 @@ export default function App() {
               <span><span className="legend-emoji">🍽️</span> Подача</span>
             </div>
           </div>
-          <button type="button" className="secondary-button edit-layout" onClick={() => setResult(null)}>Изменить разметку</button>
+          <button type="button" className="secondary-button edit-layout" onClick={() => setStep("orders")}>
+            ← Изменить разметку / заказы
+          </button>
           <VideoViewer
             ref={videoRef}
             source={source}

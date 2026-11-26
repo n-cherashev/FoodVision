@@ -52,7 +52,10 @@ internal sealed class VideoAnalyzer(InferenceRuntime inferenceRuntime, IOptions<
         }
     }
 
-    public async Task<VideoAnalysis> Analyze(IFormFile video, IReadOnlyList<TableConfiguration> configuredTables, CancellationToken cancellationToken)
+    public Task<VideoAnalysis> Analyze(IFormFile video, IReadOnlyList<TableConfiguration> configuredTables, CancellationToken cancellationToken) =>
+        Analyze(video, configuredTables, null, cancellationToken);
+
+    public async Task<VideoAnalysis> Analyze(IFormFile video, IReadOnlyList<TableConfiguration> configuredTables, IReadOnlyList<TableOrderInterval>? orders, CancellationToken cancellationToken)
     {
         var temporaryPath = Path.Combine(Path.GetTempPath(), $"foodvision-{Guid.NewGuid():N}{Path.GetExtension(video.FileName)}");
         try
@@ -116,8 +119,18 @@ internal sealed class VideoAnalyzer(InferenceRuntime inferenceRuntime, IOptions<
                         for (var tableIndex = 0; tableIndex < tableTracks.Count; tableIndex++)
                         {
                             var table = tableTracks[tableIndex];
+                            var hasActiveOrder = orders != null && orders.Any(o =>
+                                string.Equals(o.TableId, table.Id, StringComparison.OrdinalIgnoreCase) &&
+                                seconds >= o.StartSeconds &&
+                                (!o.EndSeconds.HasValue || seconds <= o.EndSeconds.Value));
                             var visible = tableDetections.Any(detection => Geometry.IoU(table.Bounds, detection.Box) >= .2f);
-                            var state = table.Seating.Classify(seconds, assignedPeople.People[tableIndex], belongings, visible, assignedPeople.Ambiguous[tableIndex]);
+                            var state = table.Seating.Classify(
+                                seconds,
+                                assignedPeople.People[tableIndex],
+                                belongings,
+                                visible,
+                                assignedPeople.Ambiguous[tableIndex],
+                                hasActiveOrder);
                             table.Samples.Add((seconds, state));
                         }
                     }
@@ -202,7 +215,7 @@ internal sealed class VideoAnalyzer(InferenceRuntime inferenceRuntime, IOptions<
         public string Id { get; } = id;
         public Box Bounds { get; } = bounds;
         public IReadOnlyList<Box> SeatingZones { get; } = seatingZones;
-        public SeatingAnalysis Seating { get; } = new(bounds, seatingZones);
+        public SeatingAnalysis Seating { get; } = new(bounds, seatingZones, releaseGracePeriod: 10.0);
         public List<(double Time, TableState State)> Samples { get; } = [];
     }
 }

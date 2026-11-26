@@ -5,7 +5,10 @@ using FoodVision.Shared.Core.Abstractions;
 
 namespace FoodVision.Api.Features.Analysis;
 
-public sealed record AnalyzeVideoRequest(IFormFile Video, IReadOnlyList<TableConfiguration> Tables) : ICommand;
+public sealed record AnalyzeVideoRequest(
+    IFormFile Video,
+    IReadOnlyList<TableConfiguration> Tables,
+    IReadOnlyList<TableOrderInterval>? Orders = null) : ICommand;
 
 public sealed class AnalyzeVideoHandler(IVideoAnalyzer analyzer) : ICommandHandler<VideoAnalysis, AnalyzeVideoRequest>
 {
@@ -24,7 +27,7 @@ public sealed class AnalyzeVideoHandler(IVideoAnalyzer analyzer) : ICommandHandl
         if (request.Tables.Any(table => !ValidBounds(table.Bounds) || table.SeatingZones.Count == 0 || table.SeatingZones.Any(zone => !ValidBounds(zone))))
             return Result.Failure<VideoAnalysis, string>("invalid:Проверьте границы столов и добавьте зону посадки для каждого стола.");
 
-        try { return Result.Success<VideoAnalysis, string>(await analyzer.Analyze(request.Video, request.Tables, cancellationToken)); }
+        try { return Result.Success<VideoAnalysis, string>(await analyzer.Analyze(request.Video, request.Tables, request.Orders, cancellationToken)); }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception exception) { return Result.Failure<VideoAnalysis, string>(exception.Message); }
     }

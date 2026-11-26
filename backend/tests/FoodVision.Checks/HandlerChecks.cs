@@ -83,7 +83,7 @@ internal static class HandlerChecks
             return Task.FromResult<IReadOnlyList<TableConfiguration>>([]);
         }
 
-        public Task<VideoAnalysis> Analyze(IFormFile video, IReadOnlyList<TableConfiguration> tables, CancellationToken cancellationToken)
+        public Task<VideoAnalysis> Analyze(IFormFile video, IReadOnlyList<TableConfiguration> tables, IReadOnlyList<TableOrderInterval>? orders, CancellationToken cancellationToken)
         {
             Analyses++;
             return Task.FromResult(VideoAnalysis.Create(1, []).Value);

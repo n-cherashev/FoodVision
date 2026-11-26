@@ -24,18 +24,47 @@ public sealed class AnalysisController(IDispatcher dispatcher) : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
-    public async Task<IActionResult> Analyze([FromForm] IFormFile video, [FromForm] string layout, CancellationToken cancellationToken)
+    public async Task<IActionResult> Analyze(
+        [FromForm] IFormFile video,
+        [FromForm] string layout,
+        [FromForm] string? orders,
+        [FromForm] string? sessionId,
+        CancellationToken cancellationToken)
     {
         TableConfiguration[] tables;
         try { tables = System.Text.Json.JsonSerializer.Deserialize<TableConfiguration[]>(layout, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)) ?? []; }
         catch (System.Text.Json.JsonException) { return BadRequest(new { error = "Не удалось прочитать разметку столов." }); }
-        var result = await dispatcher.Send<VideoAnalysis, AnalyzeVideoRequest>(new(video, tables), cancellationToken);
+
+        TableOrderInterval[] parsedOrders = [];
+        if (!string.IsNullOrWhiteSpace(orders))
+        {
+            try { parsedOrders = System.Text.Json.JsonSerializer.Deserialize<TableOrderInterval[]>(orders, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)) ?? []; }
+            catch (System.Text.Json.JsonException) { return BadRequest(new { error = "Не удалось прочитать список заказов." }); }
+        }
+
+        var result = await dispatcher.Send<VideoAnalysis, AnalyzeVideoRequest>(new(video, tables, parsedOrders), cancellationToken);
         if (result.IsSuccess)
         {
             var analysis = result.Value;
+            var effectiveSessionId = string.IsNullOrWhiteSpace(sessionId) ? $"sess-{Guid.NewGuid():N}" : sessionId;
+
+            foreach (var order in parsedOrders)
+            {
+                var orderId = $"ord-video-{Guid.NewGuid():N}";
+                await dispatcher.Send<FoodVision.Orders.Application.DTOs.OrderDetailsDto, FoodVision.Orders.Application.Features.OpenOrderCommand>(
+                    new(orderId, order.TableId, "default", order.OrderNumber, effectiveSessionId, null, null, order.GuestsCount, order.StartSeconds, DateTimeOffset.UtcNow), cancellationToken);
+
+                if (order.EndSeconds.HasValue)
+                {
+                    await dispatcher.Send<FoodVision.Orders.Application.DTOs.OrderDetailsDto, FoodVision.Orders.Application.Features.CloseOrderCommand>(
+                        new(orderId, DateTimeOffset.UtcNow, order.EndSeconds.Value), cancellationToken);
+                }
+            }
+
             return Ok(new
             {
                 analysis.DurationSeconds,
+                SessionId = effectiveSessionId,
                 Tables = analysis.Tables.Select(table => new
                 {
                     table.Id,

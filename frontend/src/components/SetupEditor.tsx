@@ -1,13 +1,18 @@
 import { useRef, useState, type PointerEvent } from "react";
 import type { Bounds, TableConfiguration } from "../types";
 
-interface SetupEditorProps { source: string; tables: TableConfiguration[]; onChange(tables: TableConfiguration[]): void; }
+interface SetupEditorProps {
+  source: string;
+  tables: TableConfiguration[];
+  onChange(tables: TableConfiguration[]): void;
+  onNext?(): void;
+}
 type Shape = "bounds" | `zone-${number}`;
 type EditorMode = { kind: "idle" } | { kind: "add-table" } | { kind: "add-zone"; tableIndex: number };
 type DragState = { tableIndex: number; shape: Shape; start: Point } | null;
 interface Point { x: number; y: number; }
 
-export function SetupEditor({ source, tables, onChange }: SetupEditorProps) {
+export function SetupEditor({ source, tables, onChange, onNext }: SetupEditorProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [duration, setDuration] = useState(0);
@@ -117,6 +122,19 @@ export function SetupEditor({ source, tables, onChange }: SetupEditorProps) {
           <button type="button" className={mode.kind === "add-zone" && mode.tableIndex === index ? "text-button active-tool" : "text-button"} onClick={() => { setMode(mode.kind === "add-zone" && mode.tableIndex === index ? { kind: "idle" } : { kind: "add-zone", tableIndex: index }); canvasRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); }}>+ Нарисовать зону посадки</button>
         </article>)}
       </div>
+
+      {onNext && (
+        <div className="setup-footer" style={{ marginTop: "24px", display: "flex", justifyContent: "flex-end" }}>
+          <button
+            type="button"
+            className="primary-button"
+            onClick={onNext}
+            disabled={tables.length === 0}
+          >
+            Далее: Указать заказы к столам →
+          </button>
+        </div>
+      )}
     </section>
   );
 }

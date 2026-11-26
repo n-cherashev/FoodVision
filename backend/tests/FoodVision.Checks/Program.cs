@@ -57,6 +57,17 @@ if (assigned.People[0].Count != 1 || assigned.People[1].Count != 0) throw new Ex
 assigned = TablePersonAssignment.Assign([Person(45)], [leftTable, rightTable]);
 if (assigned.People.Any(group => group.Count > 0) || !assigned.Ambiguous.All(value => value)) throw new Exception("An equally plausible person-table association should stay uncertain");
 Expect(new SeatingAnalysis(table, [zone]).Classify(0, [], [], true, ambiguous: true), TableState.Review, "ambiguous person assignment");
+
+var orderSeating = new SeatingAnalysis(table, [zone], releaseGracePeriod: 10.0);
+Expect(orderSeating.Classify(0, [], [], true, hasActiveOrder: true), TableState.Occupied, "open order must make table occupied without people");
+Expect(orderSeating.Classify(5, [], [], true, hasActiveOrder: true), TableState.Occupied, "open order retains occupancy");
+Expect(orderSeating.Classify(10, [], [], true, hasActiveOrder: false), TableState.Occupied, "table remains occupied during 10s timeframe after order ends");
+Expect(orderSeating.Classify(16, [], [], true, hasActiveOrder: false), TableState.Available, "table becomes available after 10s timeframe with no visitors");
+
+var visitorAfterOrder = new SeatingAnalysis(table, [zone], releaseGracePeriod: 10.0);
+visitorAfterOrder.Classify(0, [], [], true, hasActiveOrder: true);
+Expect(visitorAfterOrder.Classify(25, [Person(35, seated: true)], [], true, hasActiveOrder: false), TableState.Occupied, "visitors after order payment/end keep table occupied");
+
 Console.WriteLine("Seating scenarios passed.");
 
 var samples = new (double Time, TableState State)[]

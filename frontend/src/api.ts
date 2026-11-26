@@ -4,14 +4,25 @@ import type {
   OpenOrderPayload,
   OrderDetails,
   TableConfiguration,
+  TableOrderInterval,
 } from "./types";
 
 const apiUrl = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
-async function postVideo(path: string, video: File, signal: AbortSignal, layout?: TableConfiguration[]) {
+async function postVideo(
+  path: string,
+  video: File,
+  signal: AbortSignal,
+  layout?: TableConfiguration[],
+  orders?: TableOrderInterval[],
+  sessionId?: string
+) {
   const form = new FormData();
   form.append("video", video);
   if (layout) form.append("layout", JSON.stringify(layout));
+  if (orders && orders.length > 0) form.append("orders", JSON.stringify(orders));
+  if (sessionId) form.append("sessionId", sessionId);
+
   const response = await fetch(`${apiUrl}/api/analysis${path}`, {
     method: "POST",
     body: form,
@@ -62,8 +73,14 @@ export async function prepareTables(video: File, signal: AbortSignal): Promise<T
   return result.tables;
 }
 
-export async function analyzeVideo(video: File, layout: TableConfiguration[], signal: AbortSignal): Promise<AnalysisResult> {
-  return postVideo("", video, signal, layout) as Promise<AnalysisResult>;
+export async function analyzeVideo(
+  video: File,
+  layout: TableConfiguration[],
+  orders: TableOrderInterval[],
+  signal: AbortSignal,
+  sessionId?: string
+): Promise<AnalysisResult> {
+  return postVideo("", video, signal, layout, orders, sessionId) as Promise<AnalysisResult>;
 }
 
 export async function openOrder(payload: OpenOrderPayload): Promise<OrderDetails> {

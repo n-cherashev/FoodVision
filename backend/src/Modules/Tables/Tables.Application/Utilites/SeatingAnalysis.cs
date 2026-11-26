@@ -3,13 +3,30 @@ using FoodVision.Api.Domain;
 namespace FoodVision.Api.Utilites;
 
 // A separate instance is used for each confirmed table. Time is in video seconds.
-public sealed class SeatingAnalysis(Box table, IReadOnlyList<Box> zones)
+public sealed class SeatingAnalysis(Box table, IReadOnlyList<Box> zones, double releaseGracePeriod = 4.0)
 {
     private readonly List<Observation> _observations = [];
     private double? _lastOccupied;
 
-    public TableState Classify(double time, IReadOnlyList<Detection> people, IReadOnlyList<Detection> belongings, bool tableVisible, bool ambiguous = false)
+    public void MarkOccupied(double time)
     {
+        _lastOccupied = time;
+    }
+
+    public TableState Classify(
+        double time,
+        IReadOnlyList<Detection> people,
+        IReadOnlyList<Detection> belongings,
+        bool tableVisible,
+        bool ambiguous = false,
+        bool hasActiveOrder = false)
+    {
+        if (hasActiveOrder)
+        {
+            _lastOccupied = time;
+            return TableState.Occupied;
+        }
+
         var candidates = people.Where(person => zones.Any(zone => Geometry.Overlaps(person.Box, zone))).ToArray();
         var previous = _observations.Where(item => time - item.Time <= 2.5).ToArray();
         _observations.Clear();
@@ -41,7 +58,7 @@ public sealed class SeatingAnalysis(Box table, IReadOnlyList<Box> zones)
             _lastOccupied = time;
             return TableState.Occupied;
         }
-        if (_lastOccupied is double last && time - last <= 4) return TableState.Occupied;
+        if (_lastOccupied is double last && time - last <= releaseGracePeriod) return TableState.Occupied;
         // A person of uncertain posture may be a guest, so belongings cannot establish their absence.
         if (candidates.Length > 0 || ambiguous) return TableState.Review;
         if (belongings.Any(item => Geometry.Overlaps(item.Box, table) || zones.Any(zone => Geometry.Overlaps(item.Box, zone))))

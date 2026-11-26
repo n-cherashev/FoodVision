@@ -25,6 +25,14 @@ export interface TableConfiguration {
   seatingZones: Bounds[];
 }
 
+export interface TableOrderInterval {
+  tableId: string;
+  startSeconds: number;
+  endSeconds?: number | null;
+  orderNumber?: string;
+  guestsCount?: number;
+}
+
 export interface AnalysisResult {
   durationSeconds: number;
   sessionId?: string;
