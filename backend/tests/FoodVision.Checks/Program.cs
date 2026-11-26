@@ -50,6 +50,28 @@ var proposal = proposer.Build();
 if (proposal.Count != 1 || proposal[0].SeatingZones.Count != 1 || Math.Abs(proposal[0].SeatingZones[0].X - .3) > .001)
     throw new Exception("Repeated person detections should create a seating zone");
 
+// Test cluster merging of overlapping table candidates and noise rejection in long video
+var longProposer = new TableLayoutProposer(100, 100);
+for (var f = 0; f < 100; f++)
+{
+    // Real table 1: slight jitter in bounding boxes
+    var t1Box = (f % 2 == 0) ? new Box(20, 20, 15, 15) : new Box(21, 19, 14, 16);
+    // Real table 2: separate location
+    var t2Box = new Box(60, 60, 15, 15);
+    // Overlapping duplicate detection that occurs occasionally
+    var t1Duplicate = (f % 3 == 0) ? [Object(new Box(18, 22, 16, 14), 60)] : Array.Empty<Detection>();
+    // Transient noise detection that only appears 2 times
+    var noise = (f < 2) ? [Object(new Box(45, 10, 10, 10), 60)] : Array.Empty<Detection>();
+    // Huge invalid box covering entire room
+    var giantBox = (f % 5 == 0) ? [Object(new Box(10, 10, 80, 80), 60)] : Array.Empty<Detection>();
+
+    longProposer.AddFrame([Object(t1Box, 60), Object(t2Box, 60), ..t1Duplicate, ..noise, ..giantBox]);
+}
+var longProposal = longProposer.Build();
+if (longProposal.Count != 2)
+    throw new Exception($"Expected exactly 2 tables after merging overlapping candidates and filtering noise/giant boxes, got {longProposal.Count}");
+
+
 var leftTable = new TableAssociation(new Box(10, 40, 20, 20), [new Box(10, 20, 55, 60)]);
 var rightTable = new TableAssociation(new Box(70, 40, 20, 20), [new Box(35, 20, 55, 60)]);
 var assigned = TablePersonAssignment.Assign([Person(20)], [leftTable, rightTable]);

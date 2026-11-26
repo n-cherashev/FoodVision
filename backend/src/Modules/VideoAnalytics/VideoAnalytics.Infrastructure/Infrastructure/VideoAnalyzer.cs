@@ -35,7 +35,7 @@ internal sealed class VideoAnalyzer(InferenceRuntime inferenceRuntime, IOptions<
                     using var inputLease = inferenceRuntime.RentInput();
                     var workspace = inputLease.Workspace;
                     workspace.Prepare(frame, width, height);
-                    proposer.AddFrame(model.Detect(workspace.TableInput, .15f, classId: -1));
+                    proposer.AddFrame(model.Detect(workspace.TableInput, .20f, classId: -1));
                 }
             }
             finally { if (!decoder.HasExited) decoder.Kill(entireProcessTree: true); }
