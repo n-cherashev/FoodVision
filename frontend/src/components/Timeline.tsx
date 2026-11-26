@@ -1,11 +1,41 @@
-import type { DetectedTable, OrderDetails, TableState } from "../types";
+import { useMemo } from "react";
+import type { DetectedTable, OrderDetails, StateSegment, TableState } from "../types";
 
-const labels: Record<TableState, string> = {
+const labels: Record<string, string> = {
   occupied: "гости за столом",
   occupied_with_items: "гостей нет, стол занят вещами",
   available: "гостей и вещей нет",
-  review: "нужна проверка",
 };
+
+export function normalizeVisualSegments(segments: StateSegment[]): StateSegment[] {
+  if (!segments || segments.length === 0) return [];
+
+  let lastState: TableState = "available";
+  const resolved: StateSegment[] = [];
+
+  for (const seg of segments) {
+    const effectiveState: TableState = seg.state === "review" ? lastState : seg.state;
+    lastState = effectiveState;
+    resolved.push({
+      startSeconds: seg.startSeconds,
+      endSeconds: seg.endSeconds,
+      state: effectiveState,
+    });
+  }
+
+  // Merge adjacent segments that share the same state
+  const merged: StateSegment[] = [];
+  for (const seg of resolved) {
+    const prev = merged[merged.length - 1];
+    if (prev && prev.state === seg.state) {
+      prev.endSeconds = seg.endSeconds;
+    } else {
+      merged.push({ ...seg });
+    }
+  }
+
+  return merged;
+}
 
 interface TimelineProps {
   table: DetectedTable;
@@ -18,6 +48,7 @@ interface TimelineProps {
 export function Timeline({ table, index, duration, orders = [], onSeek }: TimelineProps) {
   const safeDuration = duration || 1;
   const tableOrders = orders.filter((o) => o.tableId === table.id);
+  const visualSegments = useMemo(() => normalizeVisualSegments(table.segments), [table.segments]);
 
   return (
     <article className="timeline">
@@ -33,18 +64,18 @@ export function Timeline({ table, index, duration, orders = [], onSeek }: Timeli
         <span>{table.id}</span>
       </div>
       <div className="bar" aria-label={`Состояния: стол ${index + 1}`}>
-        {table.segments.map((segment, segmentIndex) => (
+        {visualSegments.map((segment, segmentIndex) => (
           <button
             className={`segment ${segment.state.replaceAll("_", "-")}`}
             key={`${segment.startSeconds}-${segmentIndex}`}
-            title={`${labels[segment.state]}: ${formatTime(segment.startSeconds)}–${formatTime(segment.endSeconds)}`}
+            title={`${labels[segment.state] || labels.available}: ${formatTime(segment.startSeconds)}–${formatTime(segment.endSeconds)}`}
             style={{
               left: `${(segment.startSeconds / safeDuration) * 100}%`,
               width: `${Math.max(0, ((segment.endSeconds - segment.startSeconds) / safeDuration) * 100)}%`,
             }}
             onClick={() => onSeek(segment.startSeconds)}
           >
-            <span className="sr-only">{labels[segment.state]}</span>
+            <span className="sr-only">{labels[segment.state] || labels.available}</span>
           </button>
         ))}
 
@@ -131,9 +162,9 @@ export function Timeline({ table, index, duration, orders = [], onSeek }: Timeli
       </div>
 
       <div className="timeline-detail">
-        {table.segments.map((segment, segmentIndex) => (
+        {visualSegments.map((segment, segmentIndex) => (
           <button key={`${segment.startSeconds}-${segmentIndex}`} onClick={() => onSeek(segment.startSeconds)}>
-            <i className={segment.state.replaceAll("_", "-")} /> {formatTime(segment.startSeconds)} — {labels[segment.state]}
+            <i className={segment.state.replaceAll("_", "-")} /> {formatTime(segment.startSeconds)} — {labels[segment.state] || labels.available}
           </button>
         ))}
 

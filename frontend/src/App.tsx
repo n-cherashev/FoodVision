@@ -159,7 +159,6 @@ export default function App() {
               <span><i className="occupied" /> Гости за столом</span>
               <span><i className="occupied-with-items" /> Вещи на столе</span>
               <span><i className="available" /> Гостей и вещей нет</span>
-              <span><i className="review" /> Нужна проверка</span>
               <span><span className="legend-emoji">📋</span> Заказ</span>
               <span><span className="legend-emoji">🍽️</span> Подача</span>
             </div>

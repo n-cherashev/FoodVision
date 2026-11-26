@@ -69,20 +69,68 @@ public sealed class AnalysisController(IDispatcher dispatcher) : ControllerBase
                 {
                     table.Id,
                     table.Bounds,
-                    Segments = table.Segments.Select(segment => new
-                    {
-                        segment.StartSeconds, segment.EndSeconds,
-                        State = segment.State switch
-                        {
-                            FoodVision.Api.Domain.TableState.OccupiedWithItems => "occupied_with_items",
-                            _ => segment.State.ToString().ToLowerInvariant()
-                        }
-                    })
+                    Segments = MapVisualSegments(table.Segments)
                 })
             });
         }
         if (result.Error.StartsWith("invalid:", StringComparison.Ordinal))
             return BadRequest(new { error = result.Error[8..] });
         return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = result.Error });
+    }
+
+    private static IEnumerable<object> MapVisualSegments(IReadOnlyList<FoodVision.Api.Domain.TimeSegment> segments)
+    {
+        if (segments == null || segments.Count == 0) return [];
+
+        var resolved = new List<FoodVision.Api.Domain.TimeSegment>();
+        var lastState = FoodVision.Api.Domain.TableState.Available;
+
+        foreach (var segment in segments)
+        {
+            var effectiveState = segment.State == FoodVision.Api.Domain.TableState.Review
+                ? lastState
+                : segment.State;
+            lastState = effectiveState;
+
+            var created = FoodVision.Api.Domain.TimeSegment.Create(segment.StartSeconds, segment.EndSeconds, effectiveState);
+            if (created.IsSuccess)
+            {
+                resolved.Add(created.Value);
+            }
+        }
+
+        // Merge contiguous segments with identical states
+        var merged = new List<FoodVision.Api.Domain.TimeSegment>();
+        foreach (var segment in resolved)
+        {
+            if (merged.Count > 0 && merged[^1].State == segment.State)
+            {
+                var prev = merged[^1];
+                var combined = FoodVision.Api.Domain.TimeSegment.Create(prev.StartSeconds, segment.EndSeconds, segment.State);
+                if (combined.IsSuccess)
+                {
+                    merged[^1] = combined.Value;
+                }
+                else
+                {
+                    merged.Add(segment);
+                }
+            }
+            else
+            {
+                merged.Add(segment);
+            }
+        }
+
+        return merged.Select(segment => new
+        {
+            segment.StartSeconds,
+            segment.EndSeconds,
+            State = segment.State switch
+            {
+                FoodVision.Api.Domain.TableState.OccupiedWithItems => "occupied_with_items",
+                _ => segment.State.ToString().ToLowerInvariant()
+            }
+        });
     }
 }
