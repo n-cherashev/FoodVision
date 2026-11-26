@@ -171,6 +171,7 @@ export default function App() {
             source={source}
             tables={result.tables}
             orders={orders}
+            currentTime={currentTime}
             onTimeUpdate={setCurrentTime}
           />
           {result.tables.length === 0 ? (

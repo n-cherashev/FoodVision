@@ -21,6 +21,25 @@ services:
     gpus: all
     restart: unless-stopped
 
+  analytics:
+    build:
+      context: ./analytics
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      VIDEO_PATH: /app/videos/Cctv-Resturant-Demo.mp4
+      MODEL_PATH: /app/models/yolo11s-pose.pt
+      SHOW_DASHBOARD: "true"
+      DASHBOARD_WIDTH: "240"
+    volumes:
+      - ./models:/app/models:ro
+      - ./videos:/app/videos:ro
+      - ./analytics/config:/app/config:ro
+      - foodvision_analytics_data:/app/data
+    gpus: all
+    restart: unless-stopped
+
   frontend:
     build:
       context: .
@@ -29,4 +48,8 @@ services:
       - "8081:80"
     depends_on:
       - backend
+      - analytics
     restart: unless-stopped
+
+volumes:
+  foodvision_analytics_data:
