@@ -104,6 +104,14 @@ public partial class OrdersDbContextModelSnapshot : ModelSnapshot
                 .HasColumnType("double precision")
                 .HasColumnName("video_position_seconds");
 
+            b.Property<double?>("PaidVideoPositionSeconds")
+                .HasColumnType("double precision")
+                .HasColumnName("paid_video_position_seconds");
+
+            b.Property<double?>("ClosedVideoPositionSeconds")
+                .HasColumnType("double precision")
+                .HasColumnName("closed_video_position_seconds");
+
             b.Property<string>("WaiterId")
                 .HasMaxLength(100)
                 .HasColumnType("character varying(100)")

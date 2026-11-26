@@ -69,6 +69,42 @@ export function Timeline({ table, index, duration, orders = [], onSeek }: Timeli
                 </button>
               )}
 
+              {/* Paid pin */}
+              {order.paidVideoPositionSeconds != null && (
+                <button
+                  type="button"
+                  className="timeline-pin paid-pin"
+                  style={{
+                    left: `${Math.min(99, (order.paidVideoPositionSeconds / safeDuration) * 100)}%`,
+                  }}
+                  title={`Заказ ${order.orderNumber || ""}: оплачен в ${formatTime(order.paidVideoPositionSeconds)}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSeek(order.paidVideoPositionSeconds!);
+                  }}
+                >
+                  💳
+                </button>
+              )}
+
+              {/* Closed pin */}
+              {order.closedVideoPositionSeconds != null && (
+                <button
+                  type="button"
+                  className="timeline-pin close-pin"
+                  style={{
+                    left: `${Math.min(99, (order.closedVideoPositionSeconds / safeDuration) * 100)}%`,
+                  }}
+                  title={`Заказ ${order.orderNumber || ""}: закрыт в ${formatTime(order.closedVideoPositionSeconds)}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSeek(order.closedVideoPositionSeconds!);
+                  }}
+                >
+                  🏁
+                </button>
+              )}
+
               {/* Dish served pins */}
               {order.items
                 .filter((item) => (item.status === "Served" || item.status === 3) && item.videoPositionSeconds != null)

@@ -94,7 +94,7 @@ public static class OrderDomainChecks
     private static void CheckPaymentAndLifecycle()
     {
         var now = DateTimeOffset.UtcNow;
-        var order = Order.Create("ord-1", "table-1").Value;
+        var order = Order.Create("ord-1", "table-1", videoPositionSeconds: 122).Value;
         order.AddItem("item-1", "Кофе", "Напитки", 1, 200, 1);
 
         // Pay order
@@ -102,10 +102,16 @@ public static class OrderDomainChecks
         if (payResult.IsFailure || order.Status != OrderStatus.Paid || !order.IsActive)
             throw new Exception("Order must be Paid and remain active after payment.");
 
+        if (order.VideoPositionSeconds != 122 || order.PaidVideoPositionSeconds != 300)
+            throw new Exception($"Opening video position must be preserved after Pay: expected 122, got {order.VideoPositionSeconds}, paid: {order.PaidVideoPositionSeconds}");
+
         // Close order
         var closeResult = order.Close(now.AddMinutes(10), 600);
         if (closeResult.IsFailure || order.Status != OrderStatus.Closed || order.IsActive)
             throw new Exception("Order must be Closed and inactive after closing.");
+
+        if (order.VideoPositionSeconds != 122 || order.ClosedVideoPositionSeconds != 600)
+            throw new Exception($"Opening video position must be preserved after Close: expected 122, got {order.VideoPositionSeconds}, closed: {order.ClosedVideoPositionSeconds}");
 
         // Cannot add items to closed order
         var addAfterClose = order.AddItem("item-2", "Десерт", "Десерты", 1, 300);

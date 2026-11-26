@@ -399,9 +399,28 @@ export function OrdersPanel({
                   )}
 
                   {order.paidAt && (
-                    <span className="milestone-chip paid">
+                    <button
+                      type="button"
+                      className="milestone-chip paid"
+                      onClick={() => order.paidVideoPositionSeconds != null && onSeek(order.paidVideoPositionSeconds)}
+                      title={order.paidVideoPositionSeconds != null ? "Перемотать на момент оплаты" : undefined}
+                      disabled={order.paidVideoPositionSeconds == null}
+                    >
                       💳 Оплачен: {order.paidAmount || order.totalAmount} ₽
-                    </span>
+                      {order.paidVideoPositionSeconds != null && ` (${formatTime(order.paidVideoPositionSeconds)})`}
+                    </button>
+                  )}
+
+                  {order.closedAt && (
+                    <button
+                      type="button"
+                      className="milestone-chip closed"
+                      onClick={() => order.closedVideoPositionSeconds != null && onSeek(order.closedVideoPositionSeconds)}
+                      title={order.closedVideoPositionSeconds != null ? "Перемотать на момент закрытия заказа" : undefined}
+                      disabled={order.closedVideoPositionSeconds == null}
+                    >
+                      🏁 Закрыт{order.closedVideoPositionSeconds != null && `: ${formatTime(order.closedVideoPositionSeconds)}`}
+                    </button>
                   )}
                 </div>
 

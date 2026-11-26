@@ -22,6 +22,8 @@ public sealed record OrderDetailsDto(
     DateTimeOffset? CancelledAt,
     string? CancellationReason,
     double? VideoPositionSeconds,
+    double? PaidVideoPositionSeconds,
+    double? ClosedVideoPositionSeconds,
     long Version,
     DateTimeOffset UpdatedAt,
     IReadOnlyList<OrderItemDto> Items);
@@ -61,6 +63,8 @@ public static class OrderMapper
             order.CancelledAt,
             order.CancellationReason,
             order.VideoPositionSeconds,
+            order.PaidVideoPositionSeconds,
+            order.ClosedVideoPositionSeconds,
             order.Version,
             order.UpdatedAt,
             order.Items.Select(i => new OrderItemDto(

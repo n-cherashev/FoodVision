@@ -75,6 +75,8 @@ export interface OrderDetails {
   cancelledAt?: string | null;
   cancellationReason?: string | null;
   videoPositionSeconds?: number | null;
+  paidVideoPositionSeconds?: number | null;
+  closedVideoPositionSeconds?: number | null;
   version: number;
   updatedAt: string;
   items: OrderItem[];

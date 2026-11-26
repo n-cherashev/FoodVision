@@ -38,6 +38,8 @@ public sealed class OrdersDbContext(DbContextOptions<OrdersDbContext> options) :
             builder.Property(o => o.CancelledAt).HasColumnName("cancelled_at");
             builder.Property(o => o.CancellationReason).HasColumnName("cancellation_reason");
             builder.Property(o => o.VideoPositionSeconds).HasColumnName("video_position_seconds");
+            builder.Property(o => o.PaidVideoPositionSeconds).HasColumnName("paid_video_position_seconds");
+            builder.Property(o => o.ClosedVideoPositionSeconds).HasColumnName("closed_video_position_seconds");
 
             builder.Property(o => o.Version).HasColumnName("version").IsConcurrencyToken();
             builder.Property(o => o.UpdatedAt).HasColumnName("updated_at");

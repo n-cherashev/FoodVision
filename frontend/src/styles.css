@@ -117,6 +117,7 @@ i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }.occu
 .milestone-chip:hover { background: #255747; color: #fff; }
 .milestone-chip.served { border-color: #8bb7e8; color: #bed9fa; }
 .milestone-chip.paid { border-color: #f0c765; color: #ffe6a3; }
+.milestone-chip.closed { border-color: #8e9e98; color: #bdd0c9; }
 
 .order-items-section { background: #122b23; border: 1px solid #2d5246; border-radius: 10px; padding: 12px; }
 .order-items-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
@@ -141,6 +142,8 @@ i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }.occu
 .timeline-pin { position: absolute; top: -3px; transform: translateX(-50%); width: 26px; height: 26px; border-radius: 50%; border: 2px solid #fff; background: #1a3e33; color: #fff; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10; box-shadow: 0 2px 6px rgba(0,0,0,0.4); transition: transform 0.15s, z-index 0.15s; }
 .timeline-pin:hover { transform: translateX(-50%) scale(1.3); z-index: 20; }
 .timeline-pin.order-pin { border-color: #a9e6be; background: #133f30; }
+.timeline-pin.paid-pin { border-color: #78bdf0; background: #153549; }
+.timeline-pin.close-pin { border-color: #bdd0c9; background: #273832; }
 .timeline-pin.dish-pin { border-color: #f0c765; background: #443714; }
 .order-detail-chip { display: inline-flex; gap: 6px; align-items: center; border: 1px solid #3c6e5e; border-radius: 99px; padding: 4px 10px; background: #1a3c31; color: #a9e6be; font-size: 0.78rem; font-weight: 600; }
 .order-detail-chip:hover { background: #265948; }

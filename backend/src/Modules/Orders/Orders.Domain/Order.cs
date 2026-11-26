@@ -26,6 +26,8 @@ public sealed class Order
     public DateTimeOffset? CancelledAt { get; private set; }
     public string? CancellationReason { get; private set; }
     public double? VideoPositionSeconds { get; private set; }
+    public double? PaidVideoPositionSeconds { get; private set; }
+    public double? ClosedVideoPositionSeconds { get; private set; }
 
     public long Version { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -161,7 +163,7 @@ public sealed class Order
         PaidAt = timestamp;
         PaidAmount = amount ?? TotalAmount;
         if (videoPositionSeconds.HasValue)
-            VideoPositionSeconds = videoPositionSeconds.Value;
+            PaidVideoPositionSeconds = videoPositionSeconds.Value;
 
         UpdatedAt = timestamp;
         Version++;
@@ -181,7 +183,7 @@ public sealed class Order
         Status = OrderStatus.Closed;
         ClosedAt = timestamp;
         if (videoPositionSeconds.HasValue)
-            VideoPositionSeconds = videoPositionSeconds.Value;
+            ClosedVideoPositionSeconds = videoPositionSeconds.Value;
 
         UpdatedAt = timestamp;
         Version++;
@@ -200,8 +202,6 @@ public sealed class Order
         Status = OrderStatus.Cancelled;
         CancelledAt = timestamp;
         CancellationReason = string.IsNullOrWhiteSpace(reason) ? "Отменён" : reason.Trim();
-        if (videoPositionSeconds.HasValue)
-            VideoPositionSeconds = videoPositionSeconds.Value;
 
         UpdatedAt = timestamp;
         Version++;
@@ -222,8 +222,6 @@ public sealed class Order
 
         var timestamp = transferredAt ?? DateTimeOffset.UtcNow;
         TableId = newTableId.Trim();
-        if (videoPositionSeconds.HasValue)
-            VideoPositionSeconds = videoPositionSeconds.Value;
 
         UpdatedAt = timestamp;
         Version++;
