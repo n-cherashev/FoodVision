@@ -53,10 +53,14 @@ public sealed class TableLayoutProposer(int frameWidth, int frameHeight)
 
     public IReadOnlyList<TableConfiguration> Build()
     {
-        var minObservations = _frameIndex <= 5 ? 2 : Math.Max(3, (int)(_frameIndex * 0.04));
-
         var validCandidates = _tables
-            .Where(table => table.Observations >= minObservations && IsValidTableSize(table.Bounds))
+            .Where(table =>
+            {
+                var minObs = table.HasConfirmedSeats(_frameIndex)
+                    ? (_frameIndex <= 60 ? 2 : Math.Max(3, (int)(_frameIndex * 0.10)))
+                    : (_frameIndex <= 5 ? 2 : Math.Max(3, (int)(_frameIndex * 0.12)));
+                return table.Observations >= minObs && IsValidTableSize(table.Bounds);
+            })
             .OrderByDescending(table => table.Observations)
             .ToList();
 
@@ -97,7 +101,7 @@ public sealed class TableLayoutProposer(int frameWidth, int frameHeight)
         return clusters
             .OrderBy(table => table.Bounds.Y).ThenBy(table => table.Bounds.X)
             .Select((table, index) => new TableConfiguration($"table-{index + 1}", Normalize(table.Bounds),
-                table.BuildSeatingZones().Select(Normalize).ToArray()))
+                table.BuildSeatingZones(_frameIndex).Select(Normalize).ToArray()))
             .ToArray();
     }
 
@@ -140,9 +144,9 @@ public sealed class TableLayoutProposer(int frameWidth, int frameHeight)
     private bool ShouldMergeTables(Box a, Box b)
     {
         var iou = Geometry.IoU(a, b);
-        if (iou >= .06f) return true;
+        if (iou >= .05f) return true;
         var ioMin = IntersectionOverMinArea(a, b);
-        if (ioMin >= .10f) return true;
+        if (ioMin >= .07f) return true;
 
         var y1 = Math.Max(a.Y, b.Y);
         var y2 = Math.Min(a.Y + a.Height, b.Y + b.Height);
@@ -198,6 +202,12 @@ public sealed class TableLayoutProposer(int frameWidth, int frameHeight)
         private float _sumX, _sumY, _sumWidth, _sumHeight;
 
         public int Observations { get; private set; }
+        public bool HasConfirmedSeats(int totalFrames)
+        {
+            var minRun = totalFrames <= 10 ? 3 : Math.Min(8, Math.Max(3, (int)(totalFrames * 0.02)));
+            var minObs = totalFrames <= 10 ? 3 : Math.Min(12, Math.Max(3, (int)(totalFrames * 0.03)));
+            return _seats.Any(seat => seat.LongestRun >= minRun && seat.Observations >= minObs);
+        }
         public Box Bounds => Observations > 0
             ? new Box(_sumX / Observations, _sumY / Observations, _sumWidth / Observations, _sumHeight / Observations)
             : new Box(0, 0, 0, 0);
@@ -235,9 +245,11 @@ public sealed class TableLayoutProposer(int frameWidth, int frameHeight)
             seat.Add(person, frameIndex);
         }
 
-        public IReadOnlyList<Box> BuildSeatingZones()
+        public IReadOnlyList<Box> BuildSeatingZones(int totalFrames)
         {
-            var zones = _seats.Where(seat => seat.LongestRun >= 3).Select(seat => seat.Bounds).ToArray();
+            var minRun = totalFrames <= 10 ? 3 : Math.Min(8, Math.Max(3, (int)(totalFrames * 0.02)));
+            var minObs = totalFrames <= 10 ? 3 : Math.Min(12, Math.Max(3, (int)(totalFrames * 0.03)));
+            var zones = _seats.Where(seat => seat.LongestRun >= minRun && seat.Observations >= minObs).Select(seat => seat.Bounds).ToArray();
             return zones.Length > 0 ? zones : [new Box(Math.Max(0, Bounds.X - Bounds.Width * .4f), Math.Max(0, Bounds.Y - Bounds.Height * .75f), Bounds.Width * 1.8f, Bounds.Height * 2.5f)];
         }
     }
