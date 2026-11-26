@@ -10,6 +10,7 @@ never starts a processing run and never touches processing state.
 """
 
 import threading
+import time
 
 import cv2
 import numpy as np
@@ -107,19 +108,27 @@ def _process_video(processor):
         fps = sv.VideoInfo.from_video_path(VIDEO_PATH).fps
         # Frame-index timeline fallback when presentation timestamps are unusable.
         timeline_fps = fps if fps and np.isfinite(fps) and fps > 0 else None
+        loop_offset_time = 0.0
+        frame_interval = 1.0 / (timeline_fps or 25.0)
 
         while not _stop_event.is_set():
+            loop_start = time.monotonic()
             ret, frame = cap.read()
 
             if not ret:
-                break
+                # Video reached the end -> loop seamlessly back to beginning for live CCTV stream
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                frame_index = 0
+                last_pts_ms = None
+                loop_offset_time = video_time
+                processor.begin_run()
+                ret, frame = cap.read()
+                if not ret:
+                    break
 
             # Video timeline in seconds: the presentation timestamp when
             # reliable (finite, non-negative, strictly increasing),
-            # otherwise frame index / the video's actual FPS. Never
-            # wall-clock processing time, and never allowed to move
-            # backwards. If both sources are unusable, the timeline holds,
-            # so a timer can never increase incorrectly.
+            # otherwise frame index / the video's actual FPS.
             if use_pts:
                 pts_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
                 if (
@@ -128,11 +137,11 @@ def _process_video(processor):
                     and (last_pts_ms is None or pts_ms > last_pts_ms)
                 ):
                     last_pts_ms = pts_ms
-                    video_time = max(video_time, pts_ms / 1000.0)
+                    video_time = loop_offset_time + (pts_ms / 1000.0)
                 else:
                     use_pts = False
             if not use_pts and timeline_fps is not None:
-                video_time = max(video_time, frame_index / timeline_fps)
+                video_time = loop_offset_time + (frame_index / timeline_fps)
 
             frame, stats = processor.process_frame(frame, video_time)
 
@@ -151,7 +160,7 @@ def _process_video(processor):
                     occupancy_seconds=stats["occupancy_seconds"],
                 )
                 panel = dashboard.render(height=frame.shape[0])
-                frame = np.hstack([panel, frame])
+                frame = np.hstack([frame, panel])
 
             if not writer_tried:
                 writer = open_writer(frame, fps)
@@ -165,6 +174,13 @@ def _process_video(processor):
                 _publish_chunk(frame_data)
 
             frame_index += 1
+
+            # Real-time pacing so playback matches actual video speed
+            elapsed = time.monotonic() - loop_start
+            sleep_time = frame_interval - elapsed
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+
         completed = not _stop_event.is_set()
     finally:
         if cap is not None:
@@ -185,24 +201,26 @@ def stream_frames():
 
     A client that connects mid-run immediately receives the latest available
     frame and then every new one. Clients never trigger processing, and a
-    disconnect only ends this generator. The stream ends after the last frame
-    once processing has finished.
+    disconnect only ends this generator. The stream runs continuously as long
+    as processing is active.
     """
     last_seq = 0
-    while True:
+    while not _stop_event.is_set():
         with _frame_condition:
             while (
                 _frame_seq == last_seq
                 and not _processing_done
                 and not _stop_event.is_set()
             ):
-                _frame_condition.wait(timeout=1.0)
-            if _frame_seq == last_seq:
-                # Processing finished and there is no newer frame.
+                _frame_condition.wait(timeout=0.5)
+            if _stop_event.is_set():
+                return
+            if _frame_seq == last_seq and _processing_done:
                 return
             last_seq = _frame_seq
             chunk = _latest_chunk
-        yield chunk
+        if chunk is not None:
+            yield chunk
 
 
 def start_processing(processor=None):
