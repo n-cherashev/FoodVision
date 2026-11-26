@@ -12,6 +12,9 @@ class Settings(BaseSettings):
 
     VIDEO_PATH: str = "videos/Cctv-Resturant-Demo.mp4"
     MODEL_PATH: str = "models/yolo11x-pose.pt"
+    TABLE_MODEL_PATH: str = "models/yolo11x.onnx"
+    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/foodvision"
+    SESSION_ID: str = "live-stream"
     CONF: float = 0.25
     IOU: float = 0.50
     IMGSZ: int = 960

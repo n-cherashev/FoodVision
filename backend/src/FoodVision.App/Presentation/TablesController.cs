@@ -67,6 +67,21 @@ public sealed class TablesController(IDispatcher dispatcher) : ControllerBase
         if (result.IsFailure) return BadRequest(new { error = result.Error });
         return Ok(result.Value);
     }
+
+    [HttpGet("zones")]
+    public async Task<IActionResult> GetZones([FromQuery] string restaurantId = "default", CancellationToken cancellationToken = default)
+    {
+        var result = await dispatcher.Send<IReadOnlyList<TableZoneDto>, GetTableZonesQuery>(new(restaurantId), cancellationToken);
+        return Ok(result.Value);
+    }
+
+    [HttpPut("zones")]
+    public async Task<IActionResult> SaveZones([FromBody] IReadOnlyList<TableZoneDto> zones, [FromQuery] string restaurantId = "default", CancellationToken cancellationToken = default)
+    {
+        var result = await dispatcher.Send<IReadOnlyList<TableZoneDto>, SaveTableZonesCommand>(new(zones, restaurantId), cancellationToken);
+        if (result.IsFailure) return BadRequest(new { error = result.Error });
+        return Ok(result.Value);
+    }
 }
 
 public sealed record ConfirmCleaningRequest(

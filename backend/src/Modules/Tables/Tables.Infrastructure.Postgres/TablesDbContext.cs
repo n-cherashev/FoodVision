@@ -11,6 +11,7 @@ public sealed class TablesDbContext(DbContextOptions<TablesDbContext> options) :
 
     public DbSet<TableSessionState> TableSessionStates => Set<TableSessionState>();
     public DbSet<TableEvent> TableEvents => Set<TableEvent>();
+    public DbSet<TableZone> TableZones => Set<TableZone>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -89,6 +90,27 @@ public sealed class TablesDbContext(DbContextOptions<TablesDbContext> options) :
             builder.HasIndex(e => new { e.SessionId, e.TableId, e.ActionId })
                 .IsUnique()
                 .HasFilter("action_id IS NOT NULL");
+        });
+
+        modelBuilder.Entity<TableZone>(builder =>
+        {
+            builder.ToTable("table_zones");
+            builder.HasKey(z => z.Id);
+
+            builder.Property(z => z.Id).HasColumnName("id").HasMaxLength(100);
+            builder.Property(z => z.RestaurantId).HasColumnName("restaurant_id").HasMaxLength(100);
+            builder.Property(z => z.Name).HasColumnName("name").HasMaxLength(100);
+            builder.Property(z => z.Capacity).HasColumnName("capacity");
+            builder.Property(z => z.IsActive).HasColumnName("is_active");
+            builder.Property(z => z.CreatedAt).HasColumnName("created_at");
+            builder.Property(z => z.UpdatedAt).HasColumnName("updated_at");
+
+            builder.Property(z => z.Geometry)
+                .HasColumnName("geometry")
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    g => JsonSerializer.Serialize(g, (JsonSerializerOptions?)null),
+                    json => JsonSerializer.Deserialize<TableGeometry>(json, (JsonSerializerOptions?)null)!);
         });
     }
 }

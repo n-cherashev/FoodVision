@@ -1,10 +1,3 @@
-using FoodVision.Api.Features.Analysis;
-using FoodVision.Api.Infrastructure;
-using FoodVision.Api.Presentation;
-using Microsoft.AspNetCore.Http.Features;
-using FoodVision.Api.Benchmark;
-using FoodVision.Api.Domain;
-using FoodVision.VideoAnalytics.Infrastructure.Postgres;
 using FoodVision.Tables.Infrastructure.Postgres;
 using FoodVision.Tables.Application;
 using FoodVision.Orders.Infrastructure.Postgres;
@@ -15,20 +8,16 @@ using FoodVision.Shared.Core.Abstractions;
 var builder = WebApplication.CreateBuilder(args);
 if (!string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("FoodVision")))
 {
-    builder.Services.AddVideoAnalyticsPostgres(builder.Configuration);
     builder.Services.AddTablesPostgres(builder.Configuration);
     builder.Services.AddOrdersPostgres(builder.Configuration);
 }
-builder.Services.AddVideoAnalyticsInference(builder.Configuration);
 builder.Services.AddTablesApplication();
 builder.Services.AddOrdersApplication();
-builder.Services.AddSingleton<IBenchmarkRunner, BenchmarkRunner>();
-builder.Services.AddHandlers(typeof(AnalyzeVideoHandler).Assembly);
+builder.Services.AddHandlers(typeof(FoodVision.Tables.Application.Features.GetTableZonesHandler).Assembly);
+builder.Services.AddHandlers(typeof(FoodVision.Orders.Application.Features.OpenOrderHandler).Assembly);
 builder.Services.AddControllers();
-builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = long.MaxValue);
-builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = null);
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
-    .WithOrigins(builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? ["http://localhost:5173"])
+    .WithOrigins(builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? ["http://localhost:5173", "http://localhost:8081"])
     .AllowAnyHeader().AllowAnyMethod()));
 
 var app = builder.Build();
@@ -40,6 +29,5 @@ using (var scope = app.Services.CreateScope())
 app.UseWebSockets();
 app.UseCors();
 app.MapControllers();
-app.Map("/api/benchmark", (HttpContext context, IBenchmarkRunner runner) => runner.Run(context));
 app.MapGet("/health", () => Results.Ok(new { status = "ready" }));
 app.Run();

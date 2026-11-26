@@ -1,10 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <ItemGroup>
-    <ProjectReference Include="../Modules/VideoAnalytics/VideoAnalytics.Application/VideoAnalytics.Application.csproj" />
-    <ProjectReference Include="../Modules/VideoAnalytics/VideoAnalytics.Contracts/VideoAnalytics.Contracts.csproj" />
-    <ProjectReference Include="../Modules/VideoAnalytics/VideoAnalytics.Infrastructure/VideoAnalytics.Infrastructure.csproj" />
-    <ProjectReference Include="../Modules/Benchmark/Benchmark.Application/Benchmark.Application.csproj" />
-    <ProjectReference Include="../Modules/Benchmark/Benchmark.Contracts/Benchmark.Contracts.csproj" />
     <ProjectReference Include="../Modules/Tables/Tables.Domain/Tables.Domain.csproj" />
     <ProjectReference Include="../Modules/Tables/Tables.Contracts/Tables.Contracts.csproj" />
     <ProjectReference Include="../Modules/Tables/Tables.Application/Tables.Application.csproj" />
@@ -13,6 +8,5 @@
     <ProjectReference Include="../Modules/Orders/Orders.Domain/Orders.Domain.csproj" />
     <ProjectReference Include="../Modules/Orders/Orders.Application/Orders.Application.csproj" />
     <ProjectReference Include="../Modules/Orders/Orders.Infrastructure.Postgres/Orders.Infrastructure.Postgres.csproj" />
-    <ProjectReference Include="../Modules/VideoAnalytics/VideoAnalytics.Infrastructure.Postgres/VideoAnalytics.Infrastructure.Postgres.csproj" />
   </ItemGroup>
 </Project>

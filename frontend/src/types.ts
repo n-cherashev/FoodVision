@@ -36,6 +36,17 @@ export interface DetectedTable {
   serviceMetrics?: TableServiceMetrics;
 }
 
+export type PolygonPoint = [number, number];
+
+export interface TableZone {
+  id: string;
+  name: string;
+  capacity: number;
+  displayPolygon: PolygonPoint[];
+  countingPolygon: PolygonPoint[];
+  isActive?: boolean;
+}
+
 export interface TableConfiguration {
   id: string;
   bounds: Bounds;

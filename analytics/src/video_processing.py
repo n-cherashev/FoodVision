@@ -38,6 +38,10 @@ _processing_thread = None
 _thread_lock = threading.Lock()
 _stop_event = threading.Event()
 
+_raw_frame_lock = threading.Lock()
+_latest_raw_frame = None
+_latest_video_time = 0.0
+
 _processor = None  # shared VideoProcessor (tests may pass a stand-in)
 
 
@@ -142,6 +146,10 @@ def _process_video(processor):
                     use_pts = False
             if not use_pts and timeline_fps is not None:
                 video_time = loop_offset_time + (frame_index / timeline_fps)
+
+            with _raw_frame_lock:
+                _latest_raw_frame = frame.copy()
+                _latest_video_time = video_time
 
             frame, stats = processor.process_frame(frame, video_time)
 
@@ -275,3 +283,38 @@ def stop_processing():
             thread.join(timeout=10.0)
             if not thread.is_alive():
                 _processing_thread = None
+
+
+def get_latest_raw_frame() -> tuple[np.ndarray | None, float]:
+    """Return a copy of the latest raw video frame and its timestamp."""
+    global _latest_raw_frame, _latest_video_time
+    with _raw_frame_lock:
+        if _latest_raw_frame is None:
+            return None, 0.0
+        return _latest_raw_frame.copy(), _latest_video_time
+
+
+def get_frame_at(seconds: float) -> np.ndarray | None:
+    """Read a specific frame from the video file by timestamp in seconds."""
+    cap = cv2.VideoCapture(VIDEO_PATH)
+    if not cap.isOpened():
+        return None
+    fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+    cap.set(cv2.CAP_PROP_POS_FRAMES, int(seconds * fps))
+    ret, frame = cap.read()
+    cap.release()
+    return frame if ret else None
+
+
+def reload_processor_zones(zones: list[dict] | None = None) -> None:
+    """Hot-reload zones in the running processor without stopping the stream."""
+    proc = _get_processor()
+    proc.reload_zones(zones)
+
+
+def set_video_path(new_path: str) -> None:
+    """Switch to a new video file and restart processing."""
+    global VIDEO_PATH
+    VIDEO_PATH = new_path
+    stop_processing()
+    start_processing()

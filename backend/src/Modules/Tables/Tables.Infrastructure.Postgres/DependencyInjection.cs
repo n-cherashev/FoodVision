@@ -26,6 +26,7 @@ public static class DependencyInjection
         });
 
         services.AddScoped<ITableSessionRepository, TableSessionRepository>();
+        services.AddScoped<ITableZoneRepository, TableZoneRepository>();
         services.AddScoped<IModuleDatabaseMigrator, TablesDatabaseMigrator>();
 
         return services;

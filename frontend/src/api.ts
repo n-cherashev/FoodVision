@@ -5,6 +5,7 @@ import type {
   OrderDetails,
   TableConfiguration,
   TableOrderInterval,
+  TableZone,
 } from "./types";
 
 const apiUrl = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
@@ -153,5 +154,104 @@ export async function getOrdersBySession(sessionId: string): Promise<OrderDetail
 
 export async function getOrderById(orderId: string): Promise<OrderDetails> {
   return jsonRequest<OrderDetails>(`/api/orders/${encodeURIComponent(orderId)}`);
+}
+
+const analyticsUrl = import.meta.env.VITE_ANALYTICS_URL ?? "http://localhost:5000";
+
+export async function fetchCurrentFrame(time?: number): Promise<{ url: string; time: number; width: number; height: number }> {
+  const query = time !== undefined ? `?time=${time}` : "";
+  const res = await fetch(`${analyticsUrl}/api/video/frame${query}`);
+  if (!res.ok) throw new Error("Не удалось получить кадр с видеопотока.");
+  const frameTime = parseFloat(res.headers.get("X-Video-Time") || "0");
+  const width = parseInt(res.headers.get("X-Frame-Width") || "1280", 10);
+  const height = parseInt(res.headers.get("X-Frame-Height") || "720", 10);
+  const blob = await res.blob();
+  return { url: URL.createObjectURL(blob), time: frameTime, width, height };
+}
+
+export async function uploadVideoFile(file: File): Promise<{ success: boolean; filename: string }> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${analyticsUrl}/api/video/upload`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) throw new Error("Не удалось загрузить видеофайл.");
+  return res.json();
+}
+
+export async function autoDetectTables(time?: number): Promise<TableZone[]> {
+  const query = time !== undefined ? `?time=${time}` : "";
+  const res = await fetch(`${analyticsUrl}/api/tables/autodetect${query}`, { method: "POST" });
+  if (!res.ok) throw new Error("Ошибка автоопределения столов.");
+  const data = await res.json();
+  return (data.tables || []).map((t: any) => ({
+    id: t.id || t.name,
+    name: t.name,
+    capacity: t.max || t.capacity || 4,
+    displayPolygon: t.display_polygon || [],
+    countingPolygon: t.counting_polygon || [],
+    isActive: true,
+  }));
+}
+
+export async function fetchTableZones(): Promise<TableZone[]> {
+  try {
+    const data = await jsonRequest<any[]>("/api/tables/zones");
+    if (data && data.length > 0) {
+      return data.map((z: any) => ({
+        id: z.id,
+        name: z.name,
+        capacity: z.capacity,
+        displayPolygon: (z.displayPolygon || []).map((p: any) => Array.isArray(p) ? p : [p.x, p.y]),
+        countingPolygon: (z.countingPolygon || []).map((p: any) => Array.isArray(p) ? p : [p.x, p.y]),
+        isActive: z.isActive ?? true,
+      }));
+    }
+  } catch {
+    // fallback to analytics
+  }
+
+  const res = await fetch(`${analyticsUrl}/api/tables/zones`);
+  const list = await res.json();
+  return list.map((z: any) => ({
+    id: z.name,
+    name: z.name,
+    capacity: z.max || 4,
+    displayPolygon: z.display_polygon || [],
+    countingPolygon: z.counting_polygon || [],
+    isActive: true,
+  }));
+}
+
+export async function saveTableZones(zones: TableZone[]): Promise<void> {
+  const dtos = zones.map(z => ({
+    id: z.id,
+    name: z.name,
+    capacity: z.capacity,
+    displayPolygon: z.displayPolygon.map(([x, y]) => ({ x, y })),
+    countingPolygon: z.countingPolygon.map(([x, y]) => ({ x, y })),
+    isActive: z.isActive ?? true,
+  }));
+
+  try {
+    await jsonRequest("/api/tables/zones", {
+      method: "PUT",
+      body: JSON.stringify(dtos),
+    });
+  } catch (err) {
+    console.warn("Backend save zones error, syncing directly to analytics:", err);
+  }
+
+  await fetch(`${analyticsUrl}/api/tables/reload`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(zones.map(z => ({
+      name: z.name,
+      max: z.capacity,
+      display_polygon: z.displayPolygon,
+      counting_polygon: z.countingPolygon,
+    }))),
+  });
 }
 

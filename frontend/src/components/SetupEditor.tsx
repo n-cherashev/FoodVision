@@ -1,151 +1,533 @@
-import { useRef, useState, type PointerEvent } from "react";
-import type { Bounds, TableConfiguration } from "../types";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import type { PolygonPoint, TableZone } from "../types";
+import { autoDetectTables, fetchCurrentFrame, fetchTableZones, saveTableZones, uploadVideoFile } from "../api";
 
-interface SetupEditorProps {
-  source: string;
-  tables: TableConfiguration[];
-  onChange(tables: TableConfiguration[]): void;
-  onNext?(): void;
+interface DragTarget {
+  tableIndex: number;
+  layer: "display" | "counting";
+  pointIndex: number;
 }
-type Shape = "bounds" | `zone-${number}`;
-type EditorMode = { kind: "idle" } | { kind: "add-table" } | { kind: "add-zone"; tableIndex: number };
-type DragState = { tableIndex: number; shape: Shape; start: Point } | null;
-interface Point { x: number; y: number; }
 
-export function SetupEditor({ source, tables, onChange, onNext }: SetupEditorProps) {
-  const canvasRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [duration, setDuration] = useState(0);
-  const [time, setTime] = useState(0);
-  const [mode, setMode] = useState<EditorMode>({ kind: "idle" });
-  const [drag, setDrag] = useState<DragState>(null);
+export function SetupEditor() {
+  const [zones, setZones] = useState<TableZone[]>([]);
+  const [selectedTableIndex, setSelectedTableIndex] = useState<number>(0);
+  const [editingLayer, setEditingLayer] = useState<"display" | "counting">("display");
+  const [frameUrl, setFrameUrl] = useState<string | null>(null);
+  const [frameDimensions, setFrameDimensions] = useState<{ width: number; height: number }>({ width: 1280, height: 720 });
+  const [dragTarget, setDragTarget] = useState<DragTarget | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
-  function changeTable(index: number, update: (table: TableConfiguration) => TableConfiguration) {
-    onChange(tables.map((table, current) => current === index ? update(table) : table));
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  useEffect(() => {
+    void loadInitial();
+  }, []);
+
+  async function loadInitial() {
+    setLoading(true);
+    setStatusMessage("Загрузка кадра и разметки столов...");
+    try {
+      const [frame, loadedZones] = await Promise.all([
+        fetchCurrentFrame().catch(() => null),
+        fetchTableZones().catch(() => []),
+      ]);
+      if (frame) {
+        setFrameUrl(frame.url);
+        setFrameDimensions({ width: frame.width, height: frame.height });
+      }
+      if (loadedZones && loadedZones.length > 0) {
+        setZones(loadedZones);
+      }
+      setStatusMessage(null);
+    } catch (err) {
+      setStatusMessage("Ошибка при инициализации редактора: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setLoading(false);
+    }
   }
 
-  function editShape(tableIndex: number, shape: Shape, update: (bounds: Bounds) => Bounds) {
-    changeTable(tableIndex, (table) => {
-      if (shape === "bounds") return { ...table, bounds: normalize(update(table.bounds)) };
-      const seatingZones = [...table.seatingZones];
-      const zoneIndex = Number(shape.slice(5));
-      seatingZones[zoneIndex] = normalize(update(seatingZones[zoneIndex]));
-      return { ...table, seatingZones };
+  async function handleRefreshFrame() {
+    setLoading(true);
+    try {
+      const frame = await fetchCurrentFrame();
+      setFrameUrl(frame.url);
+      setFrameDimensions({ width: frame.width, height: frame.height });
+      setStatusMessage("Кадр обновлён.");
+    } catch (err) {
+      setStatusMessage("Не удалось захватить кадр: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleAutoDetect() {
+    setLoading(true);
+    setStatusMessage("Выполняется автодетект столов нейросетью YOLO...");
+    try {
+      const detected = await autoDetectTables();
+      if (detected.length > 0) {
+        setZones(detected);
+        setSelectedTableIndex(0);
+        setStatusMessage(`Автоматически найдено столов: ${detected.length}. Вы можете скорректировать вершины или добавить грани.`);
+      } else {
+        setStatusMessage("Столы не были обнаружены. Добавьте стол вручную кнопкой «+ Добавить стол».");
+      }
+    } catch (err) {
+      setStatusMessage("Ошибка автодетекта: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleUploadVideo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setStatusMessage(`Загрузка видео «${file.name}»...`);
+    try {
+      await uploadVideoFile(file);
+      setStatusMessage(`Видео успешно загружено. Получение первого кадра...`);
+      // Wait a moment for processing to warm up
+      setTimeout(async () => {
+        await handleRefreshFrame();
+        setUploading(false);
+      }, 1000);
+    } catch (err) {
+      setStatusMessage("Ошибка загрузки видео: " + (err instanceof Error ? err.message : String(err)));
+      setUploading(false);
+    }
+  }
+
+  async function handleSave() {
+    setLoading(true);
+    setStatusMessage("Сохранение разметки столов в базу данных...");
+    try {
+      await saveTableZones(zones);
+      setStatusMessage("✅ Разметка успешно сохранена в PostgreSQL и обновлена в AI-трансляции!");
+    } catch (err) {
+      setStatusMessage("Ошибка сохранения: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleAddTable() {
+    const nextIdx = zones.length + 1;
+    const name = `T-${nextIdx < 10 ? "0" + nextIdx : nextIdx}`;
+    const cx = Math.round(frameDimensions.width / 2);
+    const cy = Math.round(frameDimensions.height / 2);
+    const w = 140;
+    const h = 100;
+
+    const displayPoly: PolygonPoint[] = [
+      [cx - w, cy - h],
+      [cx + w, cy - h],
+      [cx + w, cy + h],
+      [cx - w, cy + h],
+    ];
+
+    const countingPoly: PolygonPoint[] = [
+      [cx - w - 40, cy - h - 40],
+      [cx + w + 40, cy - h - 40],
+      [cx + w + 40, cy + h + 40],
+      [cx - w - 40, cy + h + 40],
+    ];
+
+    const newZone: TableZone = {
+      id: name,
+      name,
+      capacity: 4,
+      displayPolygon: displayPoly,
+      countingPolygon: countingPoly,
+      isActive: true,
+    };
+
+    setZones([...zones, newZone]);
+    setSelectedTableIndex(zones.length);
+    setStatusMessage(`Добавлен стол ${name}. Перетаскивайте точки или кликайте на ребра для скругления.`);
+  }
+
+  function handleDeleteSelectedTable() {
+    if (zones.length === 0) return;
+    const next = zones.filter((_, i) => i !== selectedTableIndex);
+    setZones(next);
+    setSelectedTableIndex(Math.max(0, selectedTableIndex - 1));
+    setStatusMessage("Стол удалён.");
+  }
+
+  function getSvgCoordinates(e: ReactPointerEvent): { x: number; y: number } | null {
+    if (!svgRef.current) return null;
+    const pt = svgRef.current.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const ctm = svgRef.current.getScreenCTM();
+    if (!ctm) return null;
+    const local = pt.matrixTransform(ctm.inverse());
+    return {
+      x: Math.round(Math.max(0, Math.min(frameDimensions.width, local.x))),
+      y: Math.round(Math.max(0, Math.min(frameDimensions.height, local.y))),
+    };
+  }
+
+  function handlePointerDownVertex(
+    e: ReactPointerEvent,
+    tableIndex: number,
+    layer: "display" | "counting",
+    pointIndex: number,
+  ) {
+    e.stopPropagation();
+    e.preventDefault();
+    (e.target as Element).setPointerCapture(e.pointerId);
+    setSelectedTableIndex(tableIndex);
+    setEditingLayer(layer);
+    setDragTarget({ tableIndex, layer, pointIndex });
+  }
+
+  function handlePointerMove(e: ReactPointerEvent) {
+    if (!dragTarget) return;
+    const coords = getSvgCoordinates(e);
+    if (!coords) return;
+
+    setZones((prev) => {
+      const next = [...prev];
+      const table = { ...next[dragTarget.tableIndex] };
+      const polyProp = dragTarget.layer === "display" ? "displayPolygon" : "countingPolygon";
+      const poly = [...table[polyProp]];
+      poly[dragTarget.pointIndex] = [coords.x, coords.y];
+      table[polyProp] = poly;
+      next[dragTarget.tableIndex] = table;
+      return next;
     });
   }
 
-  function editCoordinate(tableIndex: number, shape: Shape, key: keyof Bounds, value: number) {
-    editShape(tableIndex, shape, bounds => ({ ...bounds, [key]: value }));
-  }
-
-  function point(event: PointerEvent<HTMLDivElement>): Point | null {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect || rect.width === 0 || rect.height === 0) return null;
-    return { x: clamp((event.clientX - rect.left) / rect.width, 0, 1), y: clamp((event.clientY - rect.top) / rect.height, 0, 1) };
-  }
-
-  function beginDrag(event: PointerEvent<HTMLDivElement>, tableIndex: number, shape: Shape, bounds: Bounds) {
-    if (mode.kind !== "idle") return;
-    const start = point(event);
-    if (!start) return;
-    event.stopPropagation();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setMode({ kind: "idle" });
-    setDrag({ tableIndex, shape, start });
-  }
-
-  function moveShape(event: PointerEvent<HTMLDivElement>) {
-    const current = point(event);
-    if (!current || !drag) return;
-    const deltaX = current.x - drag.start.x;
-    const deltaY = current.y - drag.start.y;
-    editShape(drag.tableIndex, drag.shape, bounds => ({ ...bounds, x: bounds.x + deltaX, y: bounds.y + deltaY }));
-    setDrag({ ...drag, start: current });
-  }
-
-  function beginDrawing(event: PointerEvent<HTMLDivElement>) {
-    const start = point(event);
-    if (!start || mode.kind === "idle") return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    if (mode.kind === "add-table") {
-      const tableIndex = tables.length;
-      onChange([...tables, { id: `table-${Date.now()}`, bounds: { x: start.x, y: start.y, width: .01, height: .01 }, seatingZones: [{ x: start.x, y: start.y, width: .01, height: .01 }] }]);
-      setDrag({ tableIndex, shape: "bounds", start });
-      return;
+  function handlePointerUp(e: ReactPointerEvent) {
+    if (dragTarget) {
+      try {
+        (e.target as Element).releasePointerCapture(e.pointerId);
+      } catch {
+        // pointer capture already released
+      }
+      setDragTarget(null);
     }
-    const tableIndex = mode.tableIndex;
-    const zoneIndex = tables[tableIndex].seatingZones.length;
-    changeTable(tableIndex, table => ({ ...table, seatingZones: [...table.seatingZones, { x: start.x, y: start.y, width: .01, height: .01 }] }));
-    setDrag({ tableIndex, shape: `zone-${zoneIndex}`, start });
   }
 
-  function resizeCreated(event: PointerEvent<HTMLDivElement>) {
-    const current = point(event);
-    if (!current || !drag || mode.kind === "idle") return;
-    const bounds = rectangleFrom(drag.start, current);
-    if (mode.kind === "add-table") {
-      changeTable(drag.tableIndex, table => ({ ...table, bounds, seatingZones: [bounds, ...table.seatingZones.slice(1)] }));
-      return;
-    }
-    editShape(drag.tableIndex, drag.shape, () => bounds);
+  // Insert vertex on edge click (splits the edge to create rounded/oval/custom tables!)
+  function handleEdgeClick(
+    e: ReactPointerEvent,
+    tableIndex: number,
+    layer: "display" | "counting",
+    edgeStartIndex: number,
+  ) {
+    e.stopPropagation();
+    const coords = getSvgCoordinates(e);
+    if (!coords) return;
+
+    setSelectedTableIndex(tableIndex);
+    setEditingLayer(layer);
+
+    setZones((prev) => {
+      const next = [...prev];
+      const table = { ...next[tableIndex] };
+      const polyProp = layer === "display" ? "displayPolygon" : "countingPolygon";
+      const poly = [...table[polyProp]];
+      // Insert new point right after edgeStartIndex
+      poly.splice(edgeStartIndex + 1, 0, [coords.x, coords.y]);
+      table[polyProp] = poly;
+      next[tableIndex] = table;
+      return next;
+    });
+
+    setStatusMessage(`Добавлена новая вершина! Теперь у стола ${zones[tableIndex].name} ${zones[tableIndex].displayPolygon.length + 1} граней.`);
   }
 
-  function finishInteraction() { setDrag(null); if (mode.kind !== "idle") setMode({ kind: "idle" }); }
+  // Right click removes vertex
+  function handleDeleteVertex(tableIndex: number, layer: "display" | "counting", pointIndex: number) {
+    setZones((prev) => {
+      const next = [...prev];
+      const table = { ...next[tableIndex] };
+      const polyProp = layer === "display" ? "displayPolygon" : "countingPolygon";
+      const poly = [...table[polyProp]];
+      if (poly.length <= 3) {
+        setStatusMessage("Нельзя удалить: у стола должно быть как минимум 3 вершины.");
+        return prev;
+      }
+      poly.splice(pointIndex, 1);
+      table[polyProp] = poly;
+      next[tableIndex] = table;
+      return next;
+    });
+    setStatusMessage("Вершина удалена.");
+  }
+
+  const selectedTable = zones[selectedTableIndex] || null;
 
   return (
-    <section className="setup-editor" aria-labelledby="setup-heading">
-      <div className="setup-heading">
-        <div><p className="eyebrow">Шаг 2 · Проверка разметки</p><h2 id="setup-heading">Проверьте столы и зоны посадки</h2></div>
-        <button type="button" className={mode.kind === "add-table" ? "secondary-button active-tool" : "secondary-button"} onClick={() => setMode(mode.kind === "add-table" ? { kind: "idle" } : { kind: "add-table" })}>+ Нарисовать стол</button>
-      </div>
-      <p className="editor-help">Нажмите «Нарисовать стол», затем протяните рамку на кадре. Существующие рамки можно перетаскивать. Для каждого стола нарисуйте одну или несколько зон посадки; числовые поля остаются доступны для точной правки.</p>
-      <div className="video-frame editor-video">
-        <video ref={videoRef} src={source} preload="metadata" onLoadedMetadata={event => setDuration(event.currentTarget.duration)} onTimeUpdate={event => setTime(event.currentTarget.currentTime)} />
-        <div ref={canvasRef} className={`table-overlay layout-canvas ${mode.kind !== "idle" ? "drawing" : ""}`} onPointerDown={beginDrawing} onPointerMove={event => { if (mode.kind === "idle") moveShape(event); else resizeCreated(event); }} onPointerUp={finishInteraction} onPointerCancel={finishInteraction}>
-          {tables.map((table, index) => <div key={table.id}>
-            <div className="table-marker editable-marker" style={style(table.bounds)} onPointerDown={event => beginDrag(event, index, "bounds", table.bounds)} role="button" tabIndex={0} aria-label={`Переместить стол ${index + 1}`}><span>Стол {index + 1}</span></div>
-            {table.seatingZones.map((zone, zoneIndex) => <div className="zone-marker editable-marker" key={zoneIndex} style={style(zone)} onPointerDown={event => beginDrag(event, index, `zone-${zoneIndex}`, zone)} role="button" tabIndex={0} aria-label={`Переместить зону посадки ${zoneIndex + 1} стола ${index + 1}`}><span>Место {zoneIndex + 1}</span></div>)}
-          </div>)}
+    <div className="polygon-editor-container">
+      <div className="editor-topbar">
+        <div className="editor-title-group">
+          <h2>📐 Интерактивный редактор столов (Геозоны)</h2>
+          <p className="editor-subtitle">
+            Кликните по линии стола, чтобы добавить точку (скругление для круглых столов). Перетаскивайте вершины мышкой. Правый клик — удалить точку.
+          </p>
         </div>
-      </div>
-      <div className="editor-playback"><button type="button" className="secondary-button" onClick={() => { const video = videoRef.current; if (video) { if (video.paused) void video.play(); else video.pause(); } }}>Воспроизвести / пауза</button><label>Кадр <input type="range" min="0" max={duration || 0} step="0.1" value={Math.min(time, duration || 0)} onChange={event => { if (videoRef.current) videoRef.current.currentTime = Number(event.target.value); }} /></label><span>{Math.floor(time)} с</span></div>
-      {mode.kind !== "idle" && <p className="drawing-hint" role="status">Протяните указатель по кадру, чтобы задать {mode.kind === "add-table" ? "границы стола" : "зону посадки"}.</p>}
-      {tables.length === 0 && <p className="message empty">Столы автоматически не найдены. Нажмите «Нарисовать стол» и добавьте их на кадр.</p>}
-      <div className="table-configurations">
-        {tables.map((table, index) => <article className="table-config" id={`table-config-${index + 1}`} key={table.id}>
-          <div className="table-config-heading"><h3>Стол {index + 1}</h3><button type="button" className="text-button danger-text" onClick={() => onChange(tables.filter((_, current) => current !== index))}>Удалить</button></div>
-          <CoordinateFields title="Стол" value={table.bounds} onChange={(key, value) => editCoordinate(index, "bounds", key, value)} />
-          {table.seatingZones.map((zone, zoneIndex) => <div className="zone-config" key={zoneIndex}>
-            <div className="table-config-heading"><strong>Зона посадки {zoneIndex + 1}</strong><button type="button" className="text-button danger-text" onClick={() => changeTable(index, current => ({ ...current, seatingZones: current.seatingZones.filter((_, i) => i !== zoneIndex) }))} disabled={table.seatingZones.length === 1}>Удалить зону</button></div>
-            <CoordinateFields title={`Зона ${zoneIndex + 1}`} value={zone} onChange={(key, value) => editCoordinate(index, `zone-${zoneIndex}`, key, value)} />
-          </div>)}
-          <button type="button" className={mode.kind === "add-zone" && mode.tableIndex === index ? "text-button active-tool" : "text-button"} onClick={() => { setMode(mode.kind === "add-zone" && mode.tableIndex === index ? { kind: "idle" } : { kind: "add-zone", tableIndex: index }); canvasRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); }}>+ Нарисовать зону посадки</button>
-        </article>)}
-      </div>
 
-      {onNext && (
-        <div className="setup-footer" style={{ marginTop: "24px", display: "flex", justifyContent: "flex-end" }}>
-          <button
-            type="button"
-            className="primary-button"
-            onClick={onNext}
-            disabled={tables.length === 0}
-          >
-            Далее: Указать заказы к столам →
+        <div className="editor-actions">
+          <label className="secondary-button upload-video-label">
+            📁 Загрузить видео
+            <input type="file" accept="video/*" style={{ display: "none" }} onChange={handleUploadVideo} disabled={uploading} />
+          </label>
+          <button type="button" className="secondary-button" onClick={handleRefreshFrame} disabled={loading}>
+            📸 Обновить кадр
+          </button>
+          <button type="button" className="secondary-button primary-accent" onClick={handleAutoDetect} disabled={loading}>
+            🤖 Автодетект столов (YOLO)
+          </button>
+          <button type="button" className="secondary-button" onClick={handleAddTable}>
+            ➕ Добавить стол
+          </button>
+          <button type="button" className="primary-button save-btn" onClick={handleSave} disabled={loading}>
+            💾 Сохранить разметку в БД
           </button>
         </div>
+      </div>
+
+      {statusMessage && (
+        <div className={`editor-alert ${statusMessage.startsWith("✅") ? "success" : "info"}`}>
+          {statusMessage}
+        </div>
       )}
-    </section>
+
+      <div className="editor-main-layout">
+        <div className="editor-viewport">
+          <div className="layer-mode-selector">
+            <span className="layer-label">Режим редактирования:</span>
+            <button
+              type="button"
+              className={`layer-btn display-layer ${editingLayer === "display" ? "active" : ""}`}
+              onClick={() => setEditingLayer("display")}
+            >
+              🟦 Столешница (Контур стола)
+            </button>
+            <button
+              type="button"
+              className={`layer-btn counting-layer ${editingLayer === "counting" ? "active" : ""}`}
+              onClick={() => setEditingLayer("counting")}
+            >
+              🟨 Зона гостей (Стулья / Посадка)
+            </button>
+          </div>
+
+          <div
+            className="canvas-stage"
+            style={{ aspectRatio: `${frameDimensions.width} / ${frameDimensions.height}` }}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+          >
+            {frameUrl ? (
+              <img src={frameUrl} alt="Захваченный стоп-кадр" className="stage-background-img" />
+            ) : (
+              <div className="stage-no-frame">Загрузка кадра видеопотока...</div>
+            )}
+
+            <svg
+              ref={svgRef}
+              viewBox={`0 0 ${frameDimensions.width} ${frameDimensions.height}`}
+              className="stage-svg-overlay"
+            >
+              {zones.map((table, tIdx) => {
+                const isSelected = tIdx === selectedTableIndex;
+                const activePoly = editingLayer === "display" ? table.displayPolygon : table.countingPolygon;
+                const inactivePoly = editingLayer === "display" ? table.countingPolygon : table.displayPolygon;
+
+                const displayPointsStr = table.displayPolygon.map((p) => `${p[0]},${p[1]}`).join(" ");
+                const countingPointsStr = table.countingPolygon.map((p) => `${p[0]},${p[1]}`).join(" ");
+
+                // Center for table badge
+                const xs = table.displayPolygon.map((p) => p[0]);
+                const ys = table.displayPolygon.map((p) => p[1]);
+                const minX = xs.length ? Math.min(...xs) : 0;
+                const maxX = xs.length ? Math.max(...xs) : 0;
+                const minY = ys.length ? Math.min(...ys) : 0;
+                const maxY = ys.length ? Math.max(...ys) : 0;
+                const centerX = (minX + maxX) / 2;
+                const centerY = (minY + maxY) / 2;
+
+                return (
+                  <g key={table.id || tIdx} className={`table-group ${isSelected ? "selected-group" : ""}`}>
+                    {/* Counting Polygon (Seating zone) */}
+                    <polygon
+                      points={countingPointsStr}
+                      className={`counting-poly-shape ${isSelected && editingLayer === "counting" ? "active-poly" : ""}`}
+                      onClick={() => {
+                        setSelectedTableIndex(tIdx);
+                        setEditingLayer("counting");
+                      }}
+                    />
+
+                    {/* Display Polygon (Tabletop) */}
+                    <polygon
+                      points={displayPointsStr}
+                      className={`display-poly-shape ${isSelected && editingLayer === "display" ? "active-poly" : ""}`}
+                      onClick={() => {
+                        setSelectedTableIndex(tIdx);
+                        setEditingLayer("display");
+                      }}
+                    />
+
+                    {/* Edge interaction zones (Click edge to insert vertex) */}
+                    {isSelected &&
+                      activePoly.map((p1, pIdx) => {
+                        const p2 = activePoly[(pIdx + 1) % activePoly.length];
+                        const midX = (p1[0] + p2[0]) / 2;
+                        const midY = (p1[1] + p2[1]) / 2;
+
+                        return (
+                          <g key={`edge-${pIdx}`} className="edge-group">
+                            <line
+                              x1={p1[0]}
+                              y1={p1[1]}
+                              x2={p2[0]}
+                              y2={p2[1]}
+                              className="edge-hover-line"
+                              onPointerDown={(e) => handleEdgeClick(e, tIdx, editingLayer, pIdx)}
+                            />
+                            {/* Midpoint '+' handle */}
+                            <circle
+                              cx={midX}
+                              cy={midY}
+                              r={5}
+                              className="edge-split-handle"
+                              onPointerDown={(e) => handleEdgeClick(e, tIdx, editingLayer, pIdx)}
+                            />
+                          </g>
+                        );
+                      })}
+
+                    {/* Vertex Draggable Handles */}
+                    {isSelected &&
+                      activePoly.map((pt, pIdx) => (
+                        <circle
+                          key={`vertex-${pIdx}`}
+                          cx={pt[0]}
+                          cy={pt[1]}
+                          r={7}
+                          className="poly-vertex-handle"
+                          onPointerDown={(e) => handlePointerDownVertex(e, tIdx, editingLayer, pIdx)}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            handleDeleteVertex(tIdx, editingLayer, pIdx);
+                          }}
+                        />
+                      ))}
+
+                    {/* Table Name Badge */}
+                    <g
+                      transform={`translate(${centerX}, ${centerY})`}
+                      className="table-badge-group"
+                      onClick={() => setSelectedTableIndex(tIdx)}
+                    >
+                      <rect x="-35" y="-14" width="70" height="24" rx="4" className="badge-bg" />
+                      <text x="0" y="3" textAnchor="middle" className="badge-text">
+                        {table.name} ({table.capacity})
+                      </text>
+                    </g>
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+        </div>
+
+        {/* Sidebar Properties Panel */}
+        <aside className="editor-sidebar">
+          <h3>Параметры столов</h3>
+          <div className="tables-list-chips">
+            {zones.map((z, idx) => (
+              <button
+                type="button"
+                key={z.id || idx}
+                className={`table-chip ${idx === selectedTableIndex ? "active" : ""}`}
+                onClick={() => setSelectedTableIndex(idx)}
+              >
+                {z.name} ({z.capacity}м)
+              </button>
+            ))}
+          </div>
+
+          {selectedTable ? (
+            <div className="selected-table-card">
+              <h4>Стол: {selectedTable.name}</h4>
+              <div className="prop-row">
+                <label>
+                  Имя стола:
+                  <input
+                    type="text"
+                    value={selectedTable.name}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setZones((prev) => {
+                        const next = [...prev];
+                        next[selectedTableIndex] = { ...next[selectedTableIndex], name: val };
+                        return next;
+                      });
+                    }}
+                  />
+                </label>
+              </div>
+
+              <div className="prop-row">
+                <label>
+                  Вместимость (гостей):
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={selectedTable.capacity}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10) || 1;
+                      setZones((prev) => {
+                        const next = [...prev];
+                        next[selectedTableIndex] = { ...next[selectedTableIndex], capacity: val };
+                        return next;
+                      });
+                    }}
+                  />
+                </label>
+              </div>
+
+              <div className="vertex-count-info">
+                <span>
+                  Точек столешницы: <strong>{selectedTable.displayPolygon.length}</strong>
+                </span>
+                <span>
+                  Точек зоны гостей: <strong>{selectedTable.countingPolygon.length}</strong>
+                </span>
+              </div>
+
+              <div className="round-table-tip">
+                💡 <strong>Подсказка для круглых столов:</strong>
+                <p>
+                  Кликайте на любое ребро стола (подсвечивается фиолетовым с плюсиком), чтобы добавить точки и получить круглую или овальную форму!
+                </p>
+              </div>
+
+              <div className="table-actions-group">
+                <button
+                  type="button"
+                  className="secondary-button danger-btn"
+                  onClick={handleDeleteSelectedTable}
+                >
+                  🗑️ Удалить этот стол
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="no-selection-hint">Выберите стол на кадре для настройки.</p>
+          )}
+        </aside>
+      </div>
+    </div>
   );
 }
-
-function CoordinateFields({ title, value, onChange }: { title: string; value: Bounds; onChange(key: keyof Bounds, value: number): void }) {
-  return <div className="coordinate-fields" aria-label={`Координаты: ${title}`}>
-    {(["x", "y", "width", "height"] as const).map(key => <label key={key}>{({ x: "X", y: "Y", width: "Ширина", height: "Высота" })[key]}<input type="number" min="0" max="1" step="0.01" value={value[key].toFixed(2)} onChange={event => onChange(key, Number(event.target.value))} /></label>)}
-  </div>;
-}
-
-function style(bounds: Bounds) { return { left: `${bounds.x * 100}%`, top: `${bounds.y * 100}%`, width: `${bounds.width * 100}%`, height: `${bounds.height * 100}%` }; }
-function rectangleFrom(start: Point, end: Point): Bounds { return normalize({ x: Math.min(start.x, end.x), y: Math.min(start.y, end.y), width: Math.abs(end.x - start.x), height: Math.abs(end.y - start.y) }); }
-function normalize(bounds: Bounds): Bounds { const x = clamp(bounds.x, 0, .99); const y = clamp(bounds.y, 0, .99); return { x, y, width: clamp(bounds.width, .01, 1 - x), height: clamp(bounds.height, .01, 1 - y) }; }
-function clamp(value: number, min: number, max: number) { return Math.min(max, Math.max(min, value)); }

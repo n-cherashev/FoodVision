@@ -1,12 +1,13 @@
 """Per-frame video processing: detection, filtering, counting, drawing."""
 
+import time
 import numpy as np
 import supervision as sv
 from ultralytics import YOLO
 
-from config import REGIONS_CONFIG_PATH, settings
-from counting.load_regions import load_zones
+from config import settings
 from counting.logged_count import LoggedCount
+from database.repository import load_active_zones, sync_table_state
 from filters.standing_filter import StandingFilter
 from services.occupancy_service import OccupancyService
 
@@ -34,7 +35,20 @@ class VideoProcessor:
         self.iou = settings.IOU
         self.imgsz = settings.IMGSZ
 
-        zones_config = load_zones(REGIONS_CONFIG_PATH)
+        self.blur_annotator = sv.BlurAnnotator(kernel_size=12)
+        self.corner_annotator = sv.BoxCornerAnnotator(color=sv.Color.WHITE)
+        self.standing_filter = StandingFilter()
+
+        self._last_synced_counts: dict[str, int] = {}
+        self._last_sync_time: float = 0.0
+
+        self.reload_zones()
+
+    def reload_zones(self, zones_config: list[dict] | None = None) -> None:
+        """Reload table zones from database or config without restarting."""
+        if zones_config is None:
+            zones_config = load_active_zones()
+
         self.tables = [
             {"id": config["name"], "max": config["max"]} for config in zones_config
         ]
@@ -50,16 +64,13 @@ class VideoProcessor:
                         color=sv.Color.WHITE,
                         thickness=2,
                     )
-                    if "display_polygon" in config
+                    if "display_polygon" in config and len(config["display_polygon"]) >= 3
                     else None
                 ),
             }
             for config in zones_config
         ]
 
-        self.blur_annotator = sv.BlurAnnotator(kernel_size=12)
-        self.corner_annotator = sv.BoxCornerAnnotator(color=sv.Color.WHITE)
-        self.standing_filter = StandingFilter()
         self.count_stabilizers = {
             config["name"]: LoggedCount(
                 increase_seconds=settings.COUNT_INCREASE_DELAY,
@@ -143,5 +154,23 @@ class VideoProcessor:
         # SEATED GUESTS is the sum of the stabilized table counts, so the total
         # always matches the per-table numbers, colors, and occupancy.
         stats["seated_guests"] = sum(stats["table_counts"].values())
+
+        # Throttled sync to PostgreSQL
+        now = time.time()
+        should_sync_all = (now - self._last_sync_time) >= 2.0
+        for zone in self.zones:
+            name = zone["name"]
+            count = stats["table_counts"][name]
+            if should_sync_all or self._last_synced_counts.get(name) != count:
+                self._last_synced_counts[name] = count
+                sync_table_state(
+                    session_id=settings.SESSION_ID,
+                    table_id=name,
+                    people_count=count,
+                    is_occupied=(count > 0),
+                    video_time=video_time,
+                )
+        if should_sync_all:
+            self._last_sync_time = now
 
         return annotated_frame, stats
