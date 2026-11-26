@@ -35,3 +35,4 @@ Thumbs.db
 
 # Local PostgreSQL configuration (credentials)
 /docker/.env.postgres
+analytics/data/

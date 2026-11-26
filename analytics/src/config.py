@@ -11,11 +11,11 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=str(PROJECT_ROOT / ".env"))
 
     VIDEO_PATH: str = "videos/Cctv-Resturant-Demo.mp4"
-    MODEL_PATH: str = "models/yolo11s-pose.pt"
-    CONF: float = 0.40
+    MODEL_PATH: str = "models/yolo11x-pose.pt"
+    CONF: float = 0.25
     IOU: float = 0.50
-    IMGSZ: int = 640
-    COUNT_INCREASE_DELAY: float = 2.0
+    IMGSZ: int = 960
+    COUNT_INCREASE_DELAY: float = 1.0
     COUNT_DECREASE_DELAY: float = 10.0
     COUNT_EMPTY_DELAY: float = 10.0
     COUNT_HISTORY_SIZE: int = 10
