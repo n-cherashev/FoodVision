@@ -3,9 +3,10 @@ import { fetchTableZones, getOrdersBySession } from "./api";
 import { SetupEditor } from "./components/SetupEditor";
 import { VideoViewer } from "./components/VideoViewer";
 import { OrdersPanel } from "./components/OrdersPanel";
+import { VideoFileAnalysisPage } from "./components/VideoFileAnalysisPage";
 import type { DetectedTable, OrderDetails, TableZone } from "./types";
 
-type AppPage = "stream" | "editor" | "orders";
+type AppPage = "stream" | "file_analysis" | "editor" | "orders";
 
 export default function App() {
   const [page, setPage] = useState<AppPage>("stream");
@@ -86,13 +87,20 @@ export default function App() {
           </button>
           <button
             type="button"
+            className={page === "file_analysis" ? "selected" : ""}
+            onClick={() => setPage("file_analysis")}
+          >
+            🎬 Анализ видеофайла
+          </button>
+          <button
+            type="button"
             className={page === "editor" ? "selected" : ""}
             onClick={() => {
               setPage("editor");
               void refreshZones();
             }}
           >
-            📐 Разметка и редактор столов
+            📐 Базовая разметка столов
           </button>
           <button
             type="button"
@@ -104,7 +112,24 @@ export default function App() {
         </nav>
       </header>
 
-      {page === "editor" && <SetupEditor />}
+      {page === "file_analysis" && (
+        <VideoFileAnalysisPage
+          initialZones={zones}
+          orders={orders}
+          onRefreshOrders={refreshOrders}
+        />
+      )}
+
+      {page === "editor" && (
+        <SetupEditor
+          initialZones={zones}
+          onSaveZones={refreshZones}
+          title="📐 Интерактивный редактор столов (База данных PostgreSQL)"
+          subtitle="Редактирование активных геозон ресторана в PostgreSQL. Изменения мгновенно применяются к AI-трансляции."
+          saveButtonLabel="💾 Сохранить разметку в БД"
+          showSaveDbButton={true}
+        />
+      )}
 
       {page === "stream" && (
         <section className="results" aria-labelledby="results-heading">

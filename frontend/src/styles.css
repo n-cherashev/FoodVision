@@ -734,5 +734,236 @@ i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }.occu
   margin: 20px 0;
 }
 
+/* =========================================================================
+   Video File Analysis Page (Custom video & per-video layout)
+   ========================================================================= */
+.video-file-page-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.file-workflow-bar {
+  background: rgba(19, 47, 40, 0.95);
+  border: 1px solid #3a6658;
+  border-radius: 16px;
+  padding: 20px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.workflow-title-block h2 {
+  margin: 0 0 4px;
+  font-size: 1.35rem;
+  color: #eef3f1;
+}
+
+.workflow-sub {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #9bb7ad;
+  max-width: 620px;
+}
+
+.step-pill-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.step-pill {
+  border: 1px solid #365c50;
+  background: #143329;
+  color: #bdd0c9;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.step-pill:hover {
+  color: #eef3f1;
+  border-color: #5ea88d;
+}
+.step-pill.active {
+  background: #256650;
+  border-color: #50e39c;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(80, 227, 156, 0.3);
+}
+
+.workflow-alert {
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 0.86rem;
+}
+.workflow-alert.info { background: #17384a; color: #bae0ff; border: 1px solid #2a6180; }
+.workflow-alert.success { background: #16402f; color: #bbf7d0; border: 1px solid #2d7a58; }
+.workflow-alert.error { background: #481e22; color: #fecdd3; border: 1px solid #8c363e; }
+
+/* File Selection Box */
+.file-selection-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(280px, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 850px) {
+  .file-selection-panel { grid-template-columns: 1fr; }
+}
+
+.file-dropzone-box {
+  background: rgba(19, 47, 40, 0.92);
+  border: 2px dashed #447a69;
+  border-radius: 16px;
+  padding: 40px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.dropzone-icon {
+  font-size: 3rem;
+}
+
+.file-dropzone-box h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #eef3f1;
+}
+
+.file-dropzone-box p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #9bb7ad;
+  max-width: 500px;
+}
+
+.file-action-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.pick-file-btn {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 20px;
+  font-size: 0.92rem;
+}
+
+.frame-extraction-status {
+  font-size: 0.82rem;
+  color: #ffd166;
+  margin-top: 10px;
+}
+
+.current-file-meta-card {
+  background: #143329;
+  border: 1px solid #365c50;
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.current-file-meta-card h4 {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #9bb7ad;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.current-file-meta-card p {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #eef3f1;
+  word-break: break-all;
+}
+
+.file-size-info {
+  font-size: 0.82rem !important;
+  color: #7da598 !important;
+}
+
+.proceed-btn {
+  margin-top: auto;
+  padding: 12px 18px;
+  font-weight: 750;
+}
+
+/* Layout Editor pane */
+.file-layout-editor-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.layout-editor-actions-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Playback pane */
+.file-playback-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.playback-top-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: #133328;
+  border: 1px solid #365c50;
+  border-radius: 12px;
+  padding: 10px 16px;
+}
+
+.playback-file-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.86rem;
+  color: #bdd0c9;
+}
+.playback-file-info strong {
+  color: #50e39c;
+}
+
+.zones-count-pill {
+  background: #1d4637;
+  color: #a9e6be;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid #3d705f;
+}
+
+.playback-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 
 

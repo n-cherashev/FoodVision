@@ -55,7 +55,6 @@ class ConnectionCloseMiddleware:
             if message["type"] == "http.response.start":
                 headers = list(message.get("headers", []))
                 headers.append((b"connection", b"close"))
-                headers.append((b"access-control-allow-origin", b"*"))
                 message = dict(message, headers=headers)
             await send(message)
 
@@ -81,9 +80,10 @@ app = FastAPI(title="FoodVision Video Analytics", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 app.add_middleware(ConnectionCloseMiddleware)

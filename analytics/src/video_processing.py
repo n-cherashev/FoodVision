@@ -90,6 +90,7 @@ def _set_processing_done():
 def _process_video(processor):
     """Run the processing pipeline once and publish frames for the streamers."""
     global _latest_raw_frame, _latest_video_time, _latest_restaurant_status
+    print(f"[VIDEO_PROCESSOR] Thread _process_video started on {VIDEO_PATH}!", flush=True)
     cap = None
     writer = None
     writer_tried = False
@@ -127,9 +128,11 @@ def _process_video(processor):
         cap = cv2.VideoCapture(VIDEO_PATH)
 
         if not cap.isOpened():
+            print(f"[VIDEO_PROCESSOR] Error reading video file: {VIDEO_PATH}", flush=True)
             raise RuntimeError(f"Error reading video file: {VIDEO_PATH}")
 
         fps = sv.VideoInfo.from_video_path(VIDEO_PATH).fps
+        print(f"[VIDEO_PROCESSOR] Video opened successfully. FPS: {fps}", flush=True)
         # Frame-index timeline fallback when presentation timestamps are unusable.
         timeline_fps = fps if fps and np.isfinite(fps) and fps > 0 else None
         loop_offset_time = 0.0
@@ -241,6 +244,9 @@ def _process_video(processor):
 
             _publish_chunks(video_frame_data, dashboard_frame_data, combined_frame_data)
 
+            if frame_index == 0 or frame_index % 25 == 0:
+                print(f"[VIDEO_PROCESSOR] Frame {frame_index}, time: {video_time:.1f}s, seated: {stats['seated_guests']}, counts: {stats['table_counts']}", flush=True)
+
             frame_index += 1
 
             # Real-time pacing so playback matches actual video speed
@@ -313,8 +319,10 @@ def start_processing(processor=None):
 
     with _thread_lock:
         if _processing_thread is not None and _processing_thread.is_alive():
+            print("[VIDEO_PROCESSOR] start_processing called, but thread already alive", flush=True)
             return
 
+        print("[VIDEO_PROCESSOR] Initializing processor and starting thread...", flush=True)
         if processor is None:
             processor = _get_processor()
 
@@ -332,6 +340,7 @@ def start_processing(processor=None):
         )
         _processing_thread = thread
         thread.start()
+        print("[VIDEO_PROCESSOR] Thread started!", flush=True)
 
 
 def stop_processing():

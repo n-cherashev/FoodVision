@@ -8,12 +8,38 @@ interface DragTarget {
   pointIndex: number;
 }
 
-export function SetupEditor() {
-  const [zones, setZones] = useState<TableZone[]>([]);
+export interface SetupEditorProps {
+  initialFrameUrl?: string | null;
+  initialFrameDimensions?: { width: number; height: number };
+  initialZones?: TableZone[];
+  onSaveZones?(zones: TableZone[]): void;
+  title?: string;
+  subtitle?: string;
+  saveButtonLabel?: string;
+  showSaveDbButton?: boolean;
+  showVideoUpload?: boolean;
+  onRefreshFrameRequest?(): Promise<{ url: string; width: number; height: number }> | void;
+}
+
+export function SetupEditor({
+  initialFrameUrl,
+  initialFrameDimensions,
+  initialZones,
+  onSaveZones,
+  title = "📐 Интерактивный редактор столов (Геозоны)",
+  subtitle = "Кликните по линии стола, чтобы добавить точку (скругление для круглых столов). Перетаскивайте вершины мышкой. Правый клик — удалить точку.",
+  saveButtonLabel = "💾 Сохранить разметку",
+  showSaveDbButton = true,
+  showVideoUpload = true,
+  onRefreshFrameRequest,
+}: SetupEditorProps = {}) {
+  const [zones, setZones] = useState<TableZone[]>(initialZones || []);
   const [selectedTableIndex, setSelectedTableIndex] = useState<number>(0);
   const [editingLayer, setEditingLayer] = useState<"display" | "counting">("display");
-  const [frameUrl, setFrameUrl] = useState<string | null>(null);
-  const [frameDimensions, setFrameDimensions] = useState<{ width: number; height: number }>({ width: 1280, height: 720 });
+  const [frameUrl, setFrameUrl] = useState<string | null>(initialFrameUrl || null);
+  const [frameDimensions, setFrameDimensions] = useState<{ width: number; height: number }>(
+    initialFrameDimensions || { width: 1280, height: 720 }
+  );
   const [dragTarget, setDragTarget] = useState<DragTarget | null>(null);
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -22,8 +48,19 @@ export function SetupEditor() {
   const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
-    void loadInitial();
-  }, []);
+    if (initialZones && initialZones.length > 0) {
+      setZones(initialZones);
+    }
+    if (initialFrameUrl) {
+      setFrameUrl(initialFrameUrl);
+    }
+    if (initialFrameDimensions) {
+      setFrameDimensions(initialFrameDimensions);
+    }
+    if (!initialZones && !initialFrameUrl) {
+      void loadInitial();
+    }
+  }, [initialZones, initialFrameUrl, initialFrameDimensions]);
 
   async function loadInitial() {
     setLoading(true);
@@ -51,9 +88,17 @@ export function SetupEditor() {
   async function handleRefreshFrame() {
     setLoading(true);
     try {
-      const frame = await fetchCurrentFrame();
-      setFrameUrl(frame.url);
-      setFrameDimensions({ width: frame.width, height: frame.height });
+      if (onRefreshFrameRequest) {
+        const customRes = await onRefreshFrameRequest();
+        if (customRes) {
+          setFrameUrl(customRes.url);
+          setFrameDimensions({ width: customRes.width, height: customRes.height });
+        }
+      } else {
+        const frame = await fetchCurrentFrame();
+        setFrameUrl(frame.url);
+        setFrameDimensions({ width: frame.width, height: frame.height });
+      }
       setStatusMessage("Кадр обновлён.");
     } catch (err) {
       setStatusMessage("Не удалось захватить кадр: " + (err instanceof Error ? err.message : String(err)));
@@ -66,7 +111,15 @@ export function SetupEditor() {
     setLoading(true);
     setStatusMessage("Выполняется автодетект столов нейросетью YOLO...");
     try {
-      const detected = await autoDetectTables();
+      let detected: TableZone[] = [];
+      if (frameUrl && frameUrl.startsWith("data:")) {
+        // Convert data URL to blob
+        const res = await fetch(frameUrl);
+        const blob = await res.blob();
+        detected = await autoDetectTables(undefined, blob);
+      } else {
+        detected = await autoDetectTables();
+      }
       if (detected.length > 0) {
         setZones(detected);
         setSelectedTableIndex(0);
@@ -102,10 +155,17 @@ export function SetupEditor() {
 
   async function handleSave() {
     setLoading(true);
-    setStatusMessage("Сохранение разметки столов в базу данных...");
+    setStatusMessage("Сохранение разметки столов...");
     try {
-      await saveTableZones(zones);
-      setStatusMessage("✅ Разметка успешно сохранена в PostgreSQL и обновлена в AI-трансляции!");
+      if (onSaveZones) {
+        onSaveZones(zones);
+      }
+      if (showSaveDbButton) {
+        await saveTableZones(zones);
+        setStatusMessage("✅ Разметка успешно сохранена в PostgreSQL и обновлена в AI-трансляции!");
+      } else {
+        setStatusMessage("✅ Разметка для видео успешно обновлена!");
+      }
     } catch (err) {
       setStatusMessage("Ошибка сохранения: " + (err instanceof Error ? err.message : String(err)));
     } finally {
@@ -267,17 +327,17 @@ export function SetupEditor() {
     <div className="polygon-editor-container">
       <div className="editor-topbar">
         <div className="editor-title-group">
-          <h2>📐 Интерактивный редактор столов (Геозоны)</h2>
-          <p className="editor-subtitle">
-            Кликните по линии стола, чтобы добавить точку (скругление для круглых столов). Перетаскивайте вершины мышкой. Правый клик — удалить точку.
-          </p>
+          <h2>{title}</h2>
+          <p className="editor-subtitle">{subtitle}</p>
         </div>
 
         <div className="editor-actions">
-          <label className="secondary-button upload-video-label">
-            📁 Загрузить видео
-            <input type="file" accept="video/*" style={{ display: "none" }} onChange={handleUploadVideo} disabled={uploading} />
-          </label>
+          {showVideoUpload && (
+            <label className="secondary-button upload-video-label">
+              📁 Загрузить видео
+              <input type="file" accept="video/*" style={{ display: "none" }} onChange={handleUploadVideo} disabled={uploading} />
+            </label>
+          )}
           <button type="button" className="secondary-button" onClick={handleRefreshFrame} disabled={loading}>
             📸 Обновить кадр
           </button>
@@ -288,7 +348,7 @@ export function SetupEditor() {
             ➕ Добавить стол
           </button>
           <button type="button" className="primary-button save-btn" onClick={handleSave} disabled={loading}>
-            💾 Сохранить разметку в БД
+            {saveButtonLabel}
           </button>
         </div>
       </div>

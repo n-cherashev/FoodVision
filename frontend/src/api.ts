@@ -181,9 +181,19 @@ export async function uploadVideoFile(file: File): Promise<{ success: boolean; f
   return res.json();
 }
 
-export async function autoDetectTables(time?: number): Promise<TableZone[]> {
-  const query = time !== undefined ? `?time=${time}` : "";
-  const res = await fetch(`${analyticsUrl}/api/tables/autodetect${query}`, { method: "POST" });
+export async function autoDetectTables(time?: number, fileBlob?: Blob | File): Promise<TableZone[]> {
+  let res: Response;
+  if (fileBlob) {
+    const form = new FormData();
+    form.append("file", fileBlob, "frame.jpg");
+    res = await fetch(`${analyticsUrl}/api/tables/autodetect`, {
+      method: "POST",
+      body: form,
+    });
+  } else {
+    const query = time !== undefined ? `?time=${time}` : "";
+    res = await fetch(`${analyticsUrl}/api/tables/autodetect${query}`, { method: "POST" });
+  }
   if (!res.ok) throw new Error("Ошибка автоопределения столов.");
   const data = await res.json();
   return (data.tables || []).map((t: any) => ({
