@@ -292,12 +292,13 @@ export function VideoFileAnalysisPage({ initialZones, orders, onRefreshOrders }:
           </div>
 
           <SetupEditor
+            videoSource={videoUrl}
             initialFrameUrl={frameUrl}
             initialFrameDimensions={frameDimensions}
             initialZones={customZones}
             onSaveZones={handleSaveCustomZones}
             title={`📐 Своя разметка столов для «${videoName}»`}
-            subtitle="Настройте столы конкретно для этого видео. Кликайте по ребрам для добавления точек (скругление круглых столов), двигайте вершины, удаляйте правым кликом."
+            subtitle="Проматывайте видео ползунком ниже, чтобы выбрать идеальный кадр для разметки. Двигайте вершины, добавляйте грани (скругление столов) или используйте автодетект YOLO."
             saveButtonLabel="💾 Применить разметку к видео"
             showSaveDbButton={false}
             showVideoUpload={false}

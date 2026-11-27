@@ -9,6 +9,7 @@ interface DragTarget {
 }
 
 export interface SetupEditorProps {
+  videoSource?: string | null;
   initialFrameUrl?: string | null;
   initialFrameDimensions?: { width: number; height: number };
   initialZones?: TableZone[];
@@ -21,7 +22,15 @@ export interface SetupEditorProps {
   onRefreshFrameRequest?(): Promise<{ url: string; width: number; height: number }> | void;
 }
 
+function formatTime(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return "00:00";
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+}
+
 export function SetupEditor({
+  videoSource,
   initialFrameUrl,
   initialFrameDimensions,
   initialZones,
@@ -45,7 +54,13 @@ export function SetupEditor({
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
+  // Video scrubber state
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentVideoTime, setCurrentVideoTime] = useState(0);
+  const [videoDuration, setVideoDuration] = useState(0);
+
   const svgRef = useRef<SVGSVGElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     if (initialZones && initialZones.length > 0) {
@@ -57,10 +72,10 @@ export function SetupEditor({
     if (initialFrameDimensions) {
       setFrameDimensions(initialFrameDimensions);
     }
-    if (!initialZones && !initialFrameUrl) {
+    if (!initialZones && !initialFrameUrl && !videoSource) {
       void loadInitial();
     }
-  }, [initialZones, initialFrameUrl, initialFrameDimensions]);
+  }, [initialZones, initialFrameUrl, initialFrameDimensions, videoSource]);
 
   async function loadInitial() {
     setLoading(true);
@@ -107,12 +122,67 @@ export function SetupEditor({
     }
   }
 
+  function handleVideoLoadedMetadata() {
+    if (videoRef.current) {
+      const v = videoRef.current;
+      setVideoDuration(v.duration || 0);
+      if (v.videoWidth && v.videoHeight) {
+        setFrameDimensions({ width: v.videoWidth, height: v.videoHeight });
+      }
+    }
+  }
+
+  function handleVideoTimeUpdate() {
+    if (videoRef.current) {
+      setCurrentVideoTime(videoRef.current.currentTime);
+    }
+  }
+
+  function togglePlayPause() {
+    if (!videoRef.current) return;
+    if (videoRef.current.paused) {
+      void videoRef.current.play();
+      setIsPlaying(true);
+    } else {
+      videoRef.current.pause();
+      setIsPlaying(false);
+    }
+  }
+
+  function seekToTime(time: number) {
+    if (!videoRef.current) return;
+    videoRef.current.currentTime = time;
+    setCurrentVideoTime(time);
+  }
+
+  function seekOffset(delta: number) {
+    if (!videoRef.current) return;
+    const dur = videoDuration || videoRef.current.duration || 100;
+    const nextTime = Math.max(0, Math.min(dur, videoRef.current.currentTime + delta));
+    seekToTime(nextTime);
+  }
+
   async function handleAutoDetect() {
     setLoading(true);
     setStatusMessage("Выполняется автодетект столов нейросетью YOLO...");
     try {
       let detected: TableZone[] = [];
-      if (frameUrl && frameUrl.startsWith("data:")) {
+      if (videoSource && videoRef.current) {
+        const v = videoRef.current;
+        const canvas = document.createElement("canvas");
+        const w = v.videoWidth || frameDimensions.width || 1280;
+        const h = v.videoHeight || frameDimensions.height || 720;
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(v, 0, 0, w, h);
+          const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+          if (blob) {
+            detected = await autoDetectTables(undefined, blob);
+          }
+        }
+      } else if (frameUrl && frameUrl.startsWith("data:")) {
         // Convert data URL to blob
         const res = await fetch(frameUrl);
         const blob = await res.blob();
@@ -120,12 +190,13 @@ export function SetupEditor({
       } else {
         detected = await autoDetectTables();
       }
+
       if (detected.length > 0) {
         setZones(detected);
         setSelectedTableIndex(0);
         setStatusMessage(`Автоматически найдено столов: ${detected.length}. Вы можете скорректировать вершины или добавить грани.`);
       } else {
-        setStatusMessage("Столы не были обнаружены. Добавьте стол вручную кнопкой «+ Добавить стол».");
+        setStatusMessage("Столы не были обнаружены на этом кадре. Попробуйте промотать видео на другой момент.");
       }
     } catch (err) {
       setStatusMessage("Ошибка автодетекта: " + (err instanceof Error ? err.message : String(err)));
@@ -385,7 +456,18 @@ export function SetupEditor({
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
           >
-            {frameUrl ? (
+            {videoSource ? (
+              <video
+                ref={videoRef}
+                src={videoSource}
+                playsInline
+                muted
+                preload="auto"
+                onLoadedMetadata={handleVideoLoadedMetadata}
+                onTimeUpdate={handleVideoTimeUpdate}
+                className="stage-background-img"
+              />
+            ) : frameUrl ? (
               <img src={frameUrl} alt="Захваченный стоп-кадр" className="stage-background-img" />
             ) : (
               <div className="stage-no-frame">Загрузка кадра видеопотока...</div>
@@ -498,6 +580,72 @@ export function SetupEditor({
               })}
             </svg>
           </div>
+
+          {/* Video Scrubbing & Playback Bar */}
+          {videoSource && (
+            <div className="editor-playback-bar">
+              <div className="playback-controls-row">
+                <button
+                  type="button"
+                  className="secondary-button play-toggle-btn"
+                  onClick={togglePlayPause}
+                >
+                  {isPlaying ? "⏸️ Пауза" : "▶️ Воспроизведение"}
+                </button>
+
+                <div className="playback-step-buttons">
+                  <button
+                    type="button"
+                    className="step-btn"
+                    onClick={() => seekOffset(-1.0)}
+                    title="Назад на 1 секунду"
+                  >
+                    ⏪ -1с
+                  </button>
+                  <button
+                    type="button"
+                    className="step-btn"
+                    onClick={() => seekOffset(-0.04)}
+                    title="Назад на 1 кадр"
+                  >
+                    ◀
+                  </button>
+                  <button
+                    type="button"
+                    className="step-btn"
+                    onClick={() => seekOffset(0.04)}
+                    title="Вперед на 1 кадр"
+                  >
+                    ▶
+                  </button>
+                  <button
+                    type="button"
+                    className="step-btn"
+                    onClick={() => seekOffset(1.0)}
+                    title="Вперед на 1 секунду"
+                  >
+                    +1с ⏩
+                  </button>
+                </div>
+
+                <div className="scrubber-range-container">
+                  <input
+                    type="range"
+                    min={0}
+                    max={videoDuration || 1}
+                    step={0.04}
+                    value={currentVideoTime}
+                    onChange={(e) => seekToTime(parseFloat(e.target.value))}
+                    className="timeline-scrubber"
+                  />
+                </div>
+
+                <span className="scrubber-timecode">
+                  ⏱️ {formatTime(currentVideoTime)} / {formatTime(videoDuration)}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Sidebar Properties Panel */}

@@ -965,5 +965,88 @@ i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }.occu
   gap: 10px;
 }
 
+/* Video Playback & Scrubber Controls in Table Editor */
+.editor-playback-bar {
+  background: #112821;
+  border: 1px solid #365c50;
+  border-radius: 12px;
+  padding: 10px 16px;
+  margin-top: 10px;
+}
+
+.playback-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.play-toggle-btn {
+  font-weight: 700;
+  padding: 7px 14px;
+  font-size: 0.82rem;
+}
+
+.playback-step-buttons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.step-btn {
+  background: #1b3d32;
+  border: 1px solid #365c50;
+  color: #bdd0c9;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.step-btn:hover {
+  background: #285445;
+  color: #ffffff;
+  border-color: #55a88c;
+}
+
+.scrubber-range-container {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+}
+
+.timeline-scrubber {
+  width: 100%;
+  height: 8px;
+  border-radius: 99px;
+  background: #1e4538;
+  outline: none;
+  cursor: pointer;
+  accent-color: #50e39c;
+}
+
+.timeline-scrubber::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #50e39c;
+  cursor: grab;
+  box-shadow: 0 0 8px rgba(80, 227, 156, 0.6);
+}
+
+.scrubber-timecode {
+  font-family: ui-monospace, monospace;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #ffd166;
+  white-space: nowrap;
+  background: #153429;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #2d5548;
+}
+
 
 
