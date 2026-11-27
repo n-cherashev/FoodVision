@@ -3,6 +3,7 @@ import type {
   AnalysisResult,
   OpenOrderPayload,
   OrderDetails,
+  RestaurantStatus,
   TableConfiguration,
   TableOrderInterval,
   TableZone,
@@ -253,5 +254,21 @@ export async function saveTableZones(zones: TableZone[]): Promise<void> {
       counting_polygon: z.countingPolygon,
     }))),
   });
+}
+
+export async function fetchRestaurantStatus(): Promise<RestaurantStatus> {
+  const res = await fetch(`${analyticsUrl}/api/restaurant/status`);
+  if (!res.ok) throw new Error("Не удалось получить статус ресторана");
+  return res.json();
+}
+
+export async function fetchCurrentVideoInfo(): Promise<{ filename: string; path: string; url: string | null }> {
+  const res = await fetch(`${analyticsUrl}/api/video/info`);
+  if (!res.ok) throw new Error("Не удалось получить информацию о текущем видео");
+  const data = await res.json();
+  return {
+    ...data,
+    url: data.url ? `${analyticsUrl}${data.url}` : null,
+  };
 }
 

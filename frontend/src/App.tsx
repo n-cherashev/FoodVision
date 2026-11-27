@@ -122,7 +122,6 @@ export default function App() {
           </div>
 
           <VideoViewer
-            source="http://localhost:5000/stream"
             tables={detectedTables}
             orders={orders}
             currentTime={currentTime}

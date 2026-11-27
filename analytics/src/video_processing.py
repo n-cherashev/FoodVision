@@ -17,7 +17,7 @@ import numpy as np
 import supervision as sv
 
 from config import settings
-from dashboard import RestaurantDashboard
+from dashboard import RestaurantDashboard, _format_duration
 from services.video_processor import VideoProcessor
 from utils.video_utils import encode_frame, resize_frame
 from utils.video_writer import close_writer, open_writer, write_frame
@@ -31,8 +31,24 @@ VIDEO_PATH = settings.VIDEO_PATH
 
 _frame_condition = threading.Condition()
 _latest_chunk = None
+_latest_video_chunk = None
+_latest_dashboard_chunk = None
+_latest_combined_chunk = None
 _frame_seq = 0
 _processing_done = False
+
+_stats_lock = threading.Lock()
+_latest_restaurant_status = {
+    "total_tables": 0,
+    "occupied_tables": 0,
+    "occupancy_rate": 0.0,
+    "seated_guests": 0,
+    "total_capacity": 0,
+    "capacity_rate": 0.0,
+    "video_time": 0.0,
+    "video_time_formatted": "00:00",
+    "tables": [],
+}
 
 _processing_thread = None
 _thread_lock = threading.Lock()
@@ -52,11 +68,14 @@ def _get_processor() -> VideoProcessor:
     return _processor
 
 
-def _publish_chunk(chunk):
-    """Store the newest encoded frame and wake every waiting streamer."""
-    global _latest_chunk, _frame_seq
+def _publish_chunks(video_chunk, dashboard_chunk=None, combined_chunk=None):
+    """Store the newest encoded frames and wake every waiting streamer."""
+    global _latest_chunk, _latest_video_chunk, _latest_dashboard_chunk, _latest_combined_chunk, _frame_seq
     with _frame_condition:
-        _latest_chunk = chunk
+        _latest_video_chunk = video_chunk
+        _latest_dashboard_chunk = dashboard_chunk
+        _latest_combined_chunk = combined_chunk
+        _latest_chunk = video_chunk  # Default is pure video without side panel
         _frame_seq += 1
         _frame_condition.notify_all()
 
@@ -70,6 +89,7 @@ def _set_processing_done():
 
 def _process_video(processor):
     """Run the processing pipeline once and publish frames for the streamers."""
+    global _latest_raw_frame, _latest_video_time, _latest_restaurant_status
     cap = None
     writer = None
     writer_tried = False
@@ -153,22 +173,65 @@ def _process_video(processor):
 
             frame, stats = processor.process_frame(frame, video_time)
 
-            # Resize the video frame only, before the dashboard is added,
-            # so the dashboard width stays independent of VIDEO_WIDTH.
+            # Resize the video frame if configured
             if settings.RESIZE_VIDEO:
                 frame = resize_frame(frame, width=settings.VIDEO_WIDTH)
 
-            # Optional dashboard panel. Counting, stabilization, timers and
-            # the occupancy database keep running either way; only the panel
-            # drawing is skipped.
-            if settings.SHOW_DASHBOARD:
-                dashboard.update(
-                    table_counts=stats["table_counts"],
-                    seated_guests=stats["seated_guests"],
-                    occupancy_seconds=stats["occupancy_seconds"],
-                )
-                panel = dashboard.render(height=frame.shape[0])
-                frame = np.hstack([frame, panel])
+            # 1. Pure video frame (clean 16:9 view with detections and polygons, no glued sidebar)
+            video_frame_data = encode_frame(frame)
+
+            # 2. Render dashboard panel separately
+            dashboard.update(
+                table_counts=stats["table_counts"],
+                seated_guests=stats["seated_guests"],
+                occupancy_seconds=stats["occupancy_seconds"],
+            )
+            panel = dashboard.render(height=frame.shape[0])
+            dashboard_frame_data = encode_frame(panel)
+
+            # 3. Combined frame (for legacy /stream?mode=combined)
+            combined_frame = np.hstack([frame, panel])
+            combined_frame_data = encode_frame(combined_frame)
+
+            # 4. Structured restaurant status JSON
+            table_statuses = []
+            total_capacity = 0
+            occupied_count = 0
+            for t in processor.tables:
+                tid = t["id"]
+                tmax = t["max"]
+                total_capacity += tmax
+                count = stats["table_counts"].get(tid, 0)
+                is_occ = count > 0
+                if is_occ:
+                    occupied_count += 1
+                occ_sec = stats["occupancy_seconds"].get(tid)
+                table_statuses.append({
+                    "id": tid,
+                    "name": tid,
+                    "count": count,
+                    "max": tmax,
+                    "state": "occupied" if is_occ else "available",
+                    "occupancy_seconds": round(occ_sec, 1) if occ_sec is not None else None,
+                    "occupancy_formatted": _format_duration(occ_sec) if occ_sec is not None else "СВОБОДЕН",
+                })
+
+            total_tables = len(processor.tables)
+            occ_rate = round((occupied_count / total_tables * 100), 1) if total_tables > 0 else 0.0
+            cap_rate = round((stats["seated_guests"] / total_capacity * 100), 1) if total_capacity > 0 else 0.0
+
+            with _stats_lock:
+                _latest_restaurant_status = {
+                    "total_tables": total_tables,
+                    "occupied_tables": occupied_count,
+                    "occupancy_rate": occ_rate,
+                    "seated_guests": stats["seated_guests"],
+                    "total_capacity": total_capacity,
+                    "capacity_rate": cap_rate,
+                    "video_time": round(video_time, 1),
+                    "video_time_formatted": _format_duration(video_time),
+                    "tables": table_statuses,
+                }
 
             if not writer_tried:
                 writer = open_writer(frame, fps)
@@ -176,10 +239,7 @@ def _process_video(processor):
 
             write_frame(writer, frame)
 
-            frame_data = encode_frame(frame)
-
-            if frame_data is not None:
-                _publish_chunk(frame_data)
+            _publish_chunks(video_frame_data, dashboard_frame_data, combined_frame_data)
 
             frame_index += 1
 
@@ -204,13 +264,13 @@ def _process_video(processor):
             _set_processing_done()
 
 
-def stream_frames():
+def stream_frames(mode: str = "video"):
     """Yield MJPEG chunks with the latest frames from the background thread.
 
-    A client that connects mid-run immediately receives the latest available
-    frame and then every new one. Clients never trigger processing, and a
-    disconnect only ends this generator. The stream runs continuously as long
-    as processing is active.
+    mode:
+      'video'     - pure video stream with YOLO poses and table polygon zones (no sidebar).
+      'dashboard' - separate visual stream of the restaurant status dashboard.
+      'combined'  - legacy combined frame (video + dashboard sidebar).
     """
     last_seq = 0
     while not _stop_event.is_set():
@@ -226,9 +286,20 @@ def stream_frames():
             if _frame_seq == last_seq and _processing_done:
                 return
             last_seq = _frame_seq
-            chunk = _latest_chunk
+            if mode == "dashboard":
+                chunk = _latest_dashboard_chunk
+            elif mode == "combined":
+                chunk = _latest_combined_chunk
+            else:
+                chunk = _latest_video_chunk
         if chunk is not None:
             yield chunk
+
+
+def get_restaurant_status() -> dict:
+    """Return the latest restaurant statistics (occupancy, guest count, table statuses)."""
+    with _stats_lock:
+        return dict(_latest_restaurant_status)
 
 
 def start_processing(processor=None):

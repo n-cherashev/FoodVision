@@ -38,6 +38,28 @@ export interface DetectedTable {
 
 export type PolygonPoint = [number, number];
 
+export interface RestaurantTableStatus {
+  id: string;
+  name: string;
+  count: number;
+  max: number;
+  state: "occupied" | "available";
+  occupancy_seconds: number | null;
+  occupancy_formatted: string;
+}
+
+export interface RestaurantStatus {
+  total_tables: number;
+  occupied_tables: number;
+  occupancy_rate: number;
+  seated_guests: number;
+  total_capacity: number;
+  capacity_rate: number;
+  video_time: number;
+  video_time_formatted: string;
+  tables: RestaurantTableStatus[];
+}
+
 export interface TableZone {
   id: string;
   name: string;

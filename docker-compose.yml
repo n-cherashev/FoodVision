@@ -51,6 +51,7 @@ services:
       - ./models:/app/models:ro
       - ./videos:/app/videos
       - ./analytics/config:/app/config:ro
+      - ./analytics/src:/app/src
       - foodvision_analytics_data:/app/data
     depends_on:
       postgres:

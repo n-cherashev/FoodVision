@@ -19,6 +19,7 @@ from database.repository import load_active_zones, save_active_zones, sync_table
 from video_processing import (
     get_frame_at,
     get_latest_raw_frame,
+    get_restaurant_status,
     reload_processor_zones,
     set_video_path,
     start_processing,
@@ -27,6 +28,7 @@ from video_processing import (
 )
 
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
+VIDEOS_DIR = PROJECT_ROOT / "videos"
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +92,9 @@ app.add_middleware(ConnectionCloseMiddleware)
 if FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
+if VIDEOS_DIR.exists():
+    app.mount("/videos", StaticFiles(directory=VIDEOS_DIR), name="videos")
+
 
 @app.get("/")
 def index():
@@ -99,11 +104,56 @@ def index():
 
 
 @app.get("/stream")
-def stream():
+def stream(mode: str = "video"):
+    """MJPEG stream. mode can be 'video' (default, video only), 'dashboard', or 'combined'."""
     return StreamingResponse(
-        stream_frames(),
+        stream_frames(mode=mode),
         media_type="multipart/x-mixed-replace; boundary=frame",
     )
+
+
+@app.get("/stream/video")
+def stream_video():
+    """Dedicated video-only stream (clean camera feed with detection/polygons, no dashboard sidebar)."""
+    return StreamingResponse(
+        stream_frames(mode="video"),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+    )
+
+
+@app.get("/stream/dashboard")
+def stream_dashboard():
+    """Dedicated visual stream of the restaurant status dashboard."""
+    return StreamingResponse(
+        stream_frames(mode="dashboard"),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+    )
+
+
+@app.get("/stream/combined")
+def stream_combined():
+    """Combined stream with video and dashboard sidebar side-by-side."""
+    return StreamingResponse(
+        stream_frames(mode="combined"),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+    )
+
+
+@app.get("/api/restaurant/status")
+def get_restaurant_status_endpoint():
+    """Return real-time restaurant metrics (table occupancy, guest count, table statuses)."""
+    return get_restaurant_status()
+
+
+@app.get("/api/video/info")
+def get_video_info():
+    """Return info about the active video file."""
+    p = Path(settings.VIDEO_PATH)
+    return {
+        "filename": p.name,
+        "path": str(p),
+        "url": f"/videos/{p.name}" if (VIDEOS_DIR / p.name).exists() else None,
+    }
 
 
 @app.get("/api/video/frame")
