@@ -19,8 +19,8 @@ type StreamLayout = "split" | "video_only" | "status_only";
 export function VideoFileAnalysisPage({ initialZones, orders, onRefreshOrders }: VideoFileAnalysisPageProps) {
   const [step, setStep] = useState<Step>("select");
   const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string>(`${analyticsUrl}/videos/Cctv-Resturant-Demo.mp4`);
-  const [videoName, setVideoName] = useState<string>("Cctv-Resturant-Demo.mp4");
+  const [videoUrl, setVideoUrl] = useState<string>(`${analyticsUrl}/videos/Cctv-Restaurant-Full-Service.mp4`);
+  const [videoName, setVideoName] = useState<string>("Cctv-Restaurant-Full-Service.mp4");
   const [availableVideos, setAvailableVideos] = useState<string[]>([]);
   const [customZones, setCustomZones] = useState<TableZone[]>(initialZones);
 
