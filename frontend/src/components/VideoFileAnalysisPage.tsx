@@ -30,15 +30,12 @@ export function VideoFileAnalysisPage({ initialZones, orders, onRefreshOrders }:
   const [frameExtractionLoading, setFrameExtractionLoading] = useState(false);
 
   // Playback & stream state
-  const [viewMode, setViewMode] = useState<"ai_stream" | "raw_video">("ai_stream");
   const [streamLayout, setStreamLayout] = useState<StreamLayout>("split");
   const [streamKey, setStreamKey] = useState<number>(() => Date.now());
   const [streamError, setStreamError] = useState(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [syncingToServer, setSyncingToServer] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
-
-  const videoRef = useRef<HTMLVideoElement>(null);
 
   // Load available server videos on mount
   useEffect(() => {
@@ -399,155 +396,89 @@ export function VideoFileAnalysisPage({ initialZones, orders, onRefreshOrders }:
             </div>
           </div>
 
-          {/* Mode Switcher Bar */}
+          {/* Layout Controls Bar */}
           <div className="viewer-mode-bar">
-            <div className="mode-toggle-group">
+            <div className="stream-layout-toggles">
+              <span className="layout-toggle-label">Режим отображения:</span>
               <button
                 type="button"
-                className={`mode-btn ${viewMode === "ai_stream" ? "active" : ""}`}
-                onClick={() => {
-                  setViewMode("ai_stream");
-                  setStreamError(false);
-                }}
+                className={`layout-btn ${streamLayout === "split" ? "active" : ""}`}
+                onClick={() => setStreamLayout("split")}
+                title="Показать видеоролик и ресторанный статус раздельно"
               >
-                📡 Поток AI-видеоаналитики (Real-Time)
+                🖥️ Видео + Статус
               </button>
               <button
                 type="button"
-                className={`mode-btn ${viewMode === "raw_video" ? "active" : ""}`}
-                onClick={() => setViewMode("raw_video")}
+                className={`layout-btn ${streamLayout === "video_only" ? "active" : ""}`}
+                onClick={() => setStreamLayout("video_only")}
+                title="Полноэкранный видеоролик без боковых панелей"
               >
-                🎥 Исходный видеоплеер (HTML5)
+                📺 Только AI-видео
+              </button>
+              <button
+                type="button"
+                className={`layout-btn ${streamLayout === "status_only" ? "active" : ""}`}
+                onClick={() => setStreamLayout("status_only")}
+                title="Только аналитическая панель статуса"
+              >
+                📊 Только статус
               </button>
             </div>
-
-            {viewMode === "ai_stream" && (
-              <div className="stream-layout-toggles">
-                <span className="layout-toggle-label">Режим отображения:</span>
-                <button
-                  type="button"
-                  className={`layout-btn ${streamLayout === "split" ? "active" : ""}`}
-                  onClick={() => setStreamLayout("split")}
-                  title="Показать видеоролик и ресторанный статус раздельно"
-                >
-                  🖥️ Видео + Статус
-                </button>
-                <button
-                  type="button"
-                  className={`layout-btn ${streamLayout === "video_only" ? "active" : ""}`}
-                  onClick={() => setStreamLayout("video_only")}
-                  title="Полноэкранный видеоролик без боковых панелей"
-                >
-                  📺 Только AI-видео
-                </button>
-                <button
-                  type="button"
-                  className={`layout-btn ${streamLayout === "status_only" ? "active" : ""}`}
-                  onClick={() => setStreamLayout("status_only")}
-                  title="Только аналитическая панель статуса"
-                >
-                  📊 Только статус
-                </button>
-              </div>
-            )}
           </div>
 
-          {/* Main Display: AI Stream or Raw Video Player */}
-          {viewMode === "ai_stream" ? (
-            <div className="stream-frame-container">
-              <div className={`ai-stream-split-layout layout-${streamLayout}`}>
-                {(streamLayout === "split" || streamLayout === "video_only") && (
-                  <div className="stream-video-pane">
-                    <div className="stream-video-header">
-                      <span className="video-stream-badge">
-                        🟢 Видеопоток аналитики: <strong>{videoName}</strong>
-                      </span>
-                      <span className="stream-fps-badge">
-                        MJPEG · Supervision · {customZones.length} столов
-                      </span>
-                    </div>
-
-                    {!streamError ? (
-                      <img
-                        key={streamKey}
-                        src={`${analyticsUrl}/stream/video?t=${streamKey}`}
-                        alt="AI Video Stream"
-                        className="ai-stream-img"
-                        onError={() => setStreamError(true)}
-                      />
-                    ) : (
-                      <div className="stream-fallback">
-                        <p>⚠️ Сервер видеоаналитики ({analyticsUrl}) не отвечает или перезапускается.</p>
-                        <button
-                          type="button"
-                          className="secondary-button"
-                          onClick={() => {
-                            setStreamError(false);
-                            setStreamKey(Date.now());
-                          }}
-                        >
-                          🔄 Повторить подключение
-                        </button>
-                      </div>
-                    )}
-
-                    <div className="stream-footer-info">
-                      <span>Камера / Файл: <strong>{videoName}</strong></span>
-                      <span>Модель: YOLO11 Pose + Детекция столов</span>
-                    </div>
+          {/* Main Display: Real-Time AI Stream */}
+          <div className="stream-frame-container">
+            <div className={`ai-stream-split-layout layout-${streamLayout}`}>
+              {(streamLayout === "split" || streamLayout === "video_only") && (
+                <div className="stream-video-pane">
+                  <div className="stream-video-header">
+                    <span className="video-stream-badge">
+                      🟢 Видеопоток аналитики: <strong>{videoName}</strong>
+                    </span>
+                    <span className="stream-fps-badge">
+                      MJPEG · Supervision · {customZones.length} столов
+                    </span>
                   </div>
-                )}
 
-                {(streamLayout === "split" || streamLayout === "status_only") && (
-                  <div className="stream-status-pane">
-                    <RestaurantStatusPanel />
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="video-frame">
-              <video
-                ref={videoRef}
-                key={videoUrl}
-                src={videoUrl}
-                controls
-                preload="metadata"
-                onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-              />
-
-              <div className="table-overlay" aria-hidden="true">
-                {detectedTablesForPlayback.map((table, index) => {
-                  const tableOrders = orders.filter((o) => o.tableId === table.id);
-                  const activeOrder = tableOrders.find(
-                    (o) => o.status === "Open" || o.status === 0 || o.status === "Paid" || o.status === 1
-                  );
-
-                  return (
-                    <div
-                      className="table-marker state-available"
-                      key={table.id}
-                      style={{
-                        left: `${table.bounds.x * 100}%`,
-                        top: `${table.bounds.y * 100}%`,
-                        width: `${table.bounds.width * 100}%`,
-                        height: `${table.bounds.height * 100}%`,
-                      }}
-                    >
-                      <span>
-                        {table.id || `Стол ${index + 1}`}
-                        {activeOrder && (
-                          <strong className="table-active-order-badge">
-                            📋 {activeOrder.orderNumber || "Заказ"} ({activeOrder.totalAmount} ₽)
-                          </strong>
-                        )}
-                      </span>
+                  {!streamError ? (
+                    <img
+                      key={streamKey}
+                      src={`${analyticsUrl}/stream/video?t=${streamKey}`}
+                      alt="AI Video Stream"
+                      className="ai-stream-img"
+                      onError={() => setStreamError(true)}
+                    />
+                  ) : (
+                    <div className="stream-fallback">
+                      <p>⚠️ Сервер видеоаналитики ({analyticsUrl}) не отвечает или перезапускается.</p>
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => {
+                          setStreamError(false);
+                          setStreamKey(Date.now());
+                        }}
+                      >
+                        🔄 Повторить подключение
+                      </button>
                     </div>
-                  );
-                })}
-              </div>
+                  )}
+
+                  <div className="stream-footer-info">
+                    <span>Камера / Файл: <strong>{videoName}</strong></span>
+                    <span>Модель: YOLO11 Pose + Детекция столов</span>
+                  </div>
+                </div>
+              )}
+
+              {(streamLayout === "split" || streamLayout === "status_only") && (
+                <div className="stream-status-pane">
+                  <RestaurantStatusPanel />
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
           {/* Orders Management for this video */}
           <OrdersPanel
@@ -555,12 +486,7 @@ export function VideoFileAnalysisPage({ initialZones, orders, onRefreshOrders }:
             tables={detectedTablesForPlayback}
             orders={orders}
             currentTime={currentTime}
-            onSeek={(s) => {
-              if (videoRef.current) {
-                videoRef.current.currentTime = s;
-                setCurrentTime(s);
-              }
-            }}
+            onSeek={(s) => setCurrentTime(s)}
             onRefreshOrders={onRefreshOrders}
           />
         </div>
