@@ -2,11 +2,23 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import type { PolygonPoint, TableZone } from "../types";
 import { autoDetectTables, fetchCurrentFrame, fetchTableZones, saveTableZones, uploadVideoFile } from "../api";
 
-interface DragTarget {
+interface DragStateVertex {
+  kind: "vertex";
   tableIndex: number;
   layer: "display" | "counting";
   pointIndex: number;
 }
+
+interface DragStateTable {
+  kind: "whole_table";
+  tableIndex: number;
+  syncZones: boolean;
+  startSvg: { x: number; y: number };
+  initialDisplay: PolygonPoint[];
+  initialCounting: PolygonPoint[];
+}
+
+type DragState = DragStateVertex | DragStateTable | null;
 
 export interface SetupEditorProps {
   videoSource?: string | null;
@@ -49,7 +61,10 @@ export function SetupEditor({
   const [frameDimensions, setFrameDimensions] = useState<{ width: number; height: number }>(
     initialFrameDimensions || { width: 1280, height: 720 }
   );
-  const [dragTarget, setDragTarget] = useState<DragTarget | null>(null);
+  const [syncBothZones, setSyncBothZones] = useState<boolean>(true);
+  const [selectedVertexIndex, setSelectedVertexIndex] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const dragTargetRef = useRef<DragState>(null);
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -288,100 +303,231 @@ export function SetupEditor({
     setStatusMessage("Стол удалён.");
   }
 
-  function getSvgCoordinates(e: ReactPointerEvent): { x: number; y: number } | null {
-    if (!svgRef.current) return null;
-    const pt = svgRef.current.createSVGPoint();
-    pt.x = e.clientX;
-    pt.y = e.clientY;
-    const ctm = svgRef.current.getScreenCTM();
+  function getSvgPoint(
+    svg: SVGSVGElement | null,
+    clientX: number,
+    clientY: number,
+    frameWidth: number,
+    frameHeight: number
+  ): { x: number; y: number } | null {
+    if (!svg) return null;
+    const pt = svg.createSVGPoint();
+    pt.x = clientX;
+    pt.y = clientY;
+    const ctm = svg.getScreenCTM();
     if (!ctm) return null;
     const local = pt.matrixTransform(ctm.inverse());
     return {
-      x: Math.round(Math.max(0, Math.min(frameDimensions.width, local.x))),
-      y: Math.round(Math.max(0, Math.min(frameDimensions.height, local.y))),
+      x: Math.round(Math.max(0, Math.min(frameWidth, local.x))),
+      y: Math.round(Math.max(0, Math.min(frameHeight, local.y))),
     };
   }
 
-  function handlePointerDownVertex(
-    e: ReactPointerEvent,
-    tableIndex: number,
-    layer: "display" | "counting",
-    pointIndex: number,
-  ) {
-    e.stopPropagation();
-    e.preventDefault();
-    (e.target as Element).setPointerCapture(e.pointerId);
-    setSelectedTableIndex(tableIndex);
-    setEditingLayer(layer);
-    setDragTarget({ tableIndex, layer, pointIndex });
+  function startDrag(drag: NonNullable<DragState>) {
+    dragTargetRef.current = drag;
+    setIsDragging(true);
+
+    const handleWindowPointerMove = (ev: PointerEvent) => {
+      const cur = dragTargetRef.current;
+      if (!cur || !svgRef.current) return;
+
+      const coords = getSvgPoint(
+        svgRef.current,
+        ev.clientX,
+        ev.clientY,
+        frameDimensions.width,
+        frameDimensions.height
+      );
+      if (!coords) return;
+
+      if (cur.kind === "vertex") {
+        setZones((prev) => {
+          if (!prev[cur.tableIndex]) return prev;
+          const next = [...prev];
+          const table = { ...next[cur.tableIndex] };
+          const polyProp = cur.layer === "display" ? "displayPolygon" : "countingPolygon";
+          const poly = table[polyProp].map((p, idx) =>
+            idx === cur.pointIndex ? ([coords.x, coords.y] as PolygonPoint) : ([...p] as PolygonPoint)
+          );
+          table[polyProp] = poly;
+          next[cur.tableIndex] = table;
+          return next;
+        });
+      } else if (cur.kind === "whole_table") {
+        const dx = coords.x - cur.startSvg.x;
+        const dy = coords.y - cur.startSvg.y;
+
+        const allPoints = cur.syncZones
+          ? [...cur.initialDisplay, ...cur.initialCounting]
+          : editingLayer === "display"
+          ? cur.initialDisplay
+          : cur.initialCounting;
+
+        const minX = Math.min(...allPoints.map((p) => p[0]));
+        const maxX = Math.max(...allPoints.map((p) => p[0]));
+        const minY = Math.min(...allPoints.map((p) => p[1]));
+        const maxY = Math.max(...allPoints.map((p) => p[1]));
+
+        const clampedDx = Math.max(-minX, Math.min(frameDimensions.width - maxX, dx));
+        const clampedDy = Math.max(-minY, Math.min(frameDimensions.height - maxY, dy));
+
+        setZones((prev) => {
+          if (!prev[cur.tableIndex]) return prev;
+          const next = [...prev];
+          const table = { ...next[cur.tableIndex] };
+
+          if (cur.syncZones) {
+            table.displayPolygon = cur.initialDisplay.map(([x, y]) => [
+              Math.round(x + clampedDx),
+              Math.round(y + clampedDy),
+            ]);
+            table.countingPolygon = cur.initialCounting.map(([x, y]) => [
+              Math.round(x + clampedDx),
+              Math.round(y + clampedDy),
+            ]);
+          } else if (editingLayer === "display") {
+            table.displayPolygon = cur.initialDisplay.map(([x, y]) => [
+              Math.round(x + clampedDx),
+              Math.round(y + clampedDy),
+            ]);
+          } else {
+            table.countingPolygon = cur.initialCounting.map(([x, y]) => [
+              Math.round(x + clampedDx),
+              Math.round(y + clampedDy),
+            ]);
+          }
+
+          next[cur.tableIndex] = table;
+          return next;
+        });
+      }
+    };
+
+    const handleWindowPointerUp = () => {
+      dragTargetRef.current = null;
+      setIsDragging(false);
+      window.removeEventListener("pointermove", handleWindowPointerMove);
+      window.removeEventListener("pointerup", handleWindowPointerUp);
+      window.removeEventListener("pointercancel", handleWindowPointerUp);
+    };
+
+    window.addEventListener("pointermove", handleWindowPointerMove, { passive: false });
+    window.addEventListener("pointerup", handleWindowPointerUp);
+    window.addEventListener("pointercancel", handleWindowPointerUp);
   }
 
-  function handlePointerMove(e: ReactPointerEvent) {
-    if (!dragTarget) return;
-    const coords = getSvgCoordinates(e);
+  function handlePolygonPointerDown(
+    e: ReactPointerEvent,
+    tableIndex: number,
+    layer: "display" | "counting"
+  ) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    setSelectedTableIndex(tableIndex);
+    setEditingLayer(layer);
+    setSelectedVertexIndex(null);
+
+    const coords = getSvgPoint(
+      svgRef.current,
+      e.clientX,
+      e.clientY,
+      frameDimensions.width,
+      frameDimensions.height
+    );
     if (!coords) return;
 
-    setZones((prev) => {
-      const next = [...prev];
-      const table = { ...next[dragTarget.tableIndex] };
-      const polyProp = dragTarget.layer === "display" ? "displayPolygon" : "countingPolygon";
-      const poly = [...table[polyProp]];
-      poly[dragTarget.pointIndex] = [coords.x, coords.y];
-      table[polyProp] = poly;
-      next[dragTarget.tableIndex] = table;
-      return next;
+    const currentTable = zones[tableIndex];
+    if (!currentTable) return;
+
+    startDrag({
+      kind: "whole_table",
+      tableIndex,
+      syncZones: syncBothZones,
+      startSvg: coords,
+      initialDisplay: currentTable.displayPolygon.map((p) => [...p]),
+      initialCounting: currentTable.countingPolygon.map((p) => [...p]),
     });
   }
 
-  function handlePointerUp(e: ReactPointerEvent) {
-    if (dragTarget) {
-      try {
-        (e.target as Element).releasePointerCapture(e.pointerId);
-      } catch {
-        // pointer capture already released
-      }
-      setDragTarget(null);
-    }
-  }
-
-  // Insert vertex on edge click (splits the edge to create rounded/oval/custom tables!)
-  function handleEdgeClick(
+  function handleVertexPointerDown(
     e: ReactPointerEvent,
     tableIndex: number,
     layer: "display" | "counting",
-    edgeStartIndex: number,
+    pointIndex: number
   ) {
+    if (e.button !== 0) return;
+    e.preventDefault();
     e.stopPropagation();
-    const coords = getSvgCoordinates(e);
-    if (!coords) return;
 
     setSelectedTableIndex(tableIndex);
     setEditingLayer(layer);
+    setSelectedVertexIndex(pointIndex);
+
+    startDrag({
+      kind: "vertex",
+      tableIndex,
+      layer,
+      pointIndex,
+    });
+  }
+
+  function handleInsertVertexAtEdge(
+    tableIndex: number,
+    layer: "display" | "counting",
+    edgeStartIndex: number,
+    insertCoords?: { x: number; y: number },
+    startDraggingImmediately: boolean = false
+  ) {
+    const newIdx = edgeStartIndex + 1;
+    setSelectedTableIndex(tableIndex);
+    setEditingLayer(layer);
+    setSelectedVertexIndex(newIdx);
 
     setZones((prev) => {
+      if (!prev[tableIndex]) return prev;
       const next = [...prev];
       const table = { ...next[tableIndex] };
       const polyProp = layer === "display" ? "displayPolygon" : "countingPolygon";
       const poly = [...table[polyProp]];
-      // Insert new point right after edgeStartIndex
-      poly.splice(edgeStartIndex + 1, 0, [coords.x, coords.y]);
+
+      let pt: PolygonPoint;
+      if (insertCoords) {
+        pt = [insertCoords.x, insertCoords.y];
+      } else {
+        const p1 = poly[edgeStartIndex];
+        const p2 = poly[(edgeStartIndex + 1) % poly.length];
+        pt = [Math.round((p1[0] + p2[0]) / 2), Math.round((p1[1] + p2[1]) / 2)];
+      }
+
+      poly.splice(newIdx, 0, pt);
       table[polyProp] = poly;
       next[tableIndex] = table;
       return next;
     });
 
-    setStatusMessage(`Добавлена новая вершина! Теперь у стола ${zones[tableIndex].name} ${zones[tableIndex].displayPolygon.length + 1} граней.`);
+    setStatusMessage(`✨ Добавлена новая вершина! Перетаскивайте её для скругления стола.`);
+
+    if (startDraggingImmediately) {
+      startDrag({
+        kind: "vertex",
+        tableIndex,
+        layer,
+        pointIndex: newIdx,
+      });
+    }
   }
 
-  // Right click removes vertex
   function handleDeleteVertex(tableIndex: number, layer: "display" | "counting", pointIndex: number) {
     setZones((prev) => {
+      if (!prev[tableIndex]) return prev;
       const next = [...prev];
       const table = { ...next[tableIndex] };
       const polyProp = layer === "display" ? "displayPolygon" : "countingPolygon";
       const poly = [...table[polyProp]];
       if (poly.length <= 3) {
-        setStatusMessage("Нельзя удалить: у стола должно быть как минимум 3 вершины.");
+        setStatusMessage("⚠️ Нельзя удалить: у стола должно оставаться не менее 3 вершин.");
         return prev;
       }
       poly.splice(pointIndex, 1);
@@ -389,8 +535,128 @@ export function SetupEditor({
       next[tableIndex] = table;
       return next;
     });
-    setStatusMessage("Вершина удалена.");
+    setSelectedVertexIndex(null);
+    setStatusMessage("🗑️ Вершина удалена.");
   }
+
+  function handleAddVertexToLongestEdge() {
+    const table = zones[selectedTableIndex];
+    if (!table) return;
+    const poly = editingLayer === "display" ? table.displayPolygon : table.countingPolygon;
+    let maxLen = -1;
+    let longestEdgeIdx = 0;
+    for (let i = 0; i < poly.length; i++) {
+      const p1 = poly[i];
+      const p2 = poly[(i + 1) % poly.length];
+      const len = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
+      if (len > maxLen) {
+        maxLen = len;
+        longestEdgeIdx = i;
+      }
+    }
+    handleInsertVertexAtEdge(selectedTableIndex, editingLayer, longestEdgeIdx);
+  }
+
+  function handleMakeRound(tableIndex: number, pointCount: number = 8) {
+    setZones((prev) => {
+      if (!prev[tableIndex]) return prev;
+      const next = [...prev];
+      const table = { ...next[tableIndex] };
+
+      const xs = table.displayPolygon.map((p) => p[0]);
+      const ys = table.displayPolygon.map((p) => p[1]);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      const rx = Math.max(20, (maxX - minX) / 2);
+      const ry = Math.max(20, (maxY - minY) / 2);
+      const pad = 35;
+
+      const newDisplay: PolygonPoint[] = [];
+      const newCounting: PolygonPoint[] = [];
+
+      for (let i = 0; i < pointCount; i++) {
+        const angle = (2 * Math.PI * i) / pointCount - Math.PI / 2;
+        const cosA = Math.cos(angle);
+        const sinA = Math.sin(angle);
+        newDisplay.push([
+          Math.round(cx + rx * cosA),
+          Math.round(cy + ry * sinA),
+        ]);
+        newCounting.push([
+          Math.round(cx + (rx + pad) * cosA),
+          Math.round(cy + (ry + pad) * sinA),
+        ]);
+      }
+
+      table.displayPolygon = newDisplay;
+      table.countingPolygon = newCounting;
+      next[tableIndex] = table;
+      return next;
+    });
+    setSelectedVertexIndex(null);
+    setStatusMessage(`⚪ Стол преобразован в круглый/овальный (${pointCount} вершин). Перетаскивайте точки для подгонки.`);
+  }
+
+  function handleMakeRectangle(tableIndex: number) {
+    setZones((prev) => {
+      if (!prev[tableIndex]) return prev;
+      const next = [...prev];
+      const table = { ...next[tableIndex] };
+
+      const xs = table.displayPolygon.map((p) => p[0]);
+      const ys = table.displayPolygon.map((p) => p[1]);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      const pad = 35;
+
+      table.displayPolygon = [
+        [minX, minY],
+        [maxX, minY],
+        [maxX, maxY],
+        [minX, maxY],
+      ];
+      table.countingPolygon = [
+        [minX - pad, minY - pad],
+        [maxX + pad, minY - pad],
+        [maxX + pad, maxY + pad],
+        [minX - pad, maxY + pad],
+      ];
+      next[tableIndex] = table;
+      return next;
+    });
+    setSelectedVertexIndex(null);
+    setStatusMessage("⬛ Стол преобразован в прямоугольный (4 вершины).");
+  }
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (
+        document.activeElement?.tagName === "INPUT" ||
+        document.activeElement?.tagName === "TEXTAREA"
+      ) {
+        return;
+      }
+
+      if (e.key === "Delete" || e.key === "Backspace") {
+        if (selectedVertexIndex !== null && zones[selectedTableIndex]) {
+          e.preventDefault();
+          handleDeleteVertex(selectedTableIndex, editingLayer, selectedVertexIndex);
+        }
+      } else if (e.key === "Escape") {
+        setSelectedVertexIndex(null);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedVertexIndex, selectedTableIndex, editingLayer, zones]);
 
   const selectedTable = zones[selectedTableIndex] || null;
 
@@ -451,10 +717,8 @@ export function SetupEditor({
           </div>
 
           <div
-            className="canvas-stage"
+            className={`canvas-stage ${isDragging ? "dragging" : ""}`}
             style={{ aspectRatio: `${frameDimensions.width} / ${frameDimensions.height}` }}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
           >
             {videoSource ? (
               <video
@@ -481,7 +745,6 @@ export function SetupEditor({
               {zones.map((table, tIdx) => {
                 const isSelected = tIdx === selectedTableIndex;
                 const activePoly = editingLayer === "display" ? table.displayPolygon : table.countingPolygon;
-                const inactivePoly = editingLayer === "display" ? table.countingPolygon : table.displayPolygon;
 
                 const displayPointsStr = table.displayPolygon.map((p) => `${p[0]},${p[1]}`).join(" ");
                 const countingPointsStr = table.countingPolygon.map((p) => `${p[0]},${p[1]}`).join(" ");
@@ -498,27 +761,21 @@ export function SetupEditor({
 
                 return (
                   <g key={table.id || tIdx} className={`table-group ${isSelected ? "selected-group" : ""}`}>
-                    {/* Counting Polygon (Seating zone) */}
+                    {/* 1. Counting Polygon (Seating zone / Chairs) */}
                     <polygon
                       points={countingPointsStr}
                       className={`counting-poly-shape ${isSelected && editingLayer === "counting" ? "active-poly" : ""}`}
-                      onClick={() => {
-                        setSelectedTableIndex(tIdx);
-                        setEditingLayer("counting");
-                      }}
+                      onPointerDown={(e) => handlePolygonPointerDown(e, tIdx, "counting")}
                     />
 
-                    {/* Display Polygon (Tabletop) */}
+                    {/* 2. Display Polygon (Tabletop) */}
                     <polygon
                       points={displayPointsStr}
                       className={`display-poly-shape ${isSelected && editingLayer === "display" ? "active-poly" : ""}`}
-                      onClick={() => {
-                        setSelectedTableIndex(tIdx);
-                        setEditingLayer("display");
-                      }}
+                      onPointerDown={(e) => handlePolygonPointerDown(e, tIdx, "display")}
                     />
 
-                    {/* Edge interaction zones (Click edge to insert vertex) */}
+                    {/* 3. Edge interaction zones (Click edge or '+' to insert vertex) */}
                     {isSelected &&
                       activePoly.map((p1, pIdx) => {
                         const p2 = activePoly[(pIdx + 1) % activePoly.length];
@@ -533,46 +790,81 @@ export function SetupEditor({
                               x2={p2[0]}
                               y2={p2[1]}
                               className="edge-hover-line"
-                              onPointerDown={(e) => handleEdgeClick(e, tIdx, editingLayer, pIdx)}
+                              onPointerDown={(e) => {
+                                if (e.button !== 0) return;
+                                e.stopPropagation();
+                                e.preventDefault();
+                                const coords = getSvgPoint(svgRef.current, e.clientX, e.clientY, frameDimensions.width, frameDimensions.height);
+                                handleInsertVertexAtEdge(tIdx, editingLayer, pIdx, coords || undefined, true);
+                              }}
                             />
                             {/* Midpoint '+' handle */}
-                            <circle
-                              cx={midX}
-                              cy={midY}
-                              r={5}
-                              className="edge-split-handle"
-                              onPointerDown={(e) => handleEdgeClick(e, tIdx, editingLayer, pIdx)}
-                            />
+                            <g
+                              className="edge-split-handle-group"
+                              onPointerDown={(e) => {
+                                if (e.button !== 0) return;
+                                e.stopPropagation();
+                                e.preventDefault();
+                                handleInsertVertexAtEdge(tIdx, editingLayer, pIdx, { x: midX, y: midY }, true);
+                              }}
+                            >
+                              <circle cx={midX} cy={midY} r={12} className="edge-split-hit-area" />
+                              <circle cx={midX} cy={midY} r={6} className="edge-split-handle" />
+                              <text x={midX} y={midY + 3.5} textAnchor="middle" className="edge-split-plus">
+                                +
+                              </text>
+                            </g>
                           </g>
                         );
                       })}
 
-                    {/* Vertex Draggable Handles */}
+                    {/* 4. Vertex Draggable Handles (Rendered on top of edges for perfect hit testing) */}
                     {isSelected &&
-                      activePoly.map((pt, pIdx) => (
-                        <circle
-                          key={`vertex-${pIdx}`}
-                          cx={pt[0]}
-                          cy={pt[1]}
-                          r={7}
-                          className="poly-vertex-handle"
-                          onPointerDown={(e) => handlePointerDownVertex(e, tIdx, editingLayer, pIdx)}
-                          onContextMenu={(e) => {
-                            e.preventDefault();
-                            handleDeleteVertex(tIdx, editingLayer, pIdx);
-                          }}
-                        />
-                      ))}
+                      activePoly.map((pt, pIdx) => {
+                        const isVertexSelected = selectedVertexIndex === pIdx;
+                        return (
+                          <g
+                            key={`vertex-${pIdx}`}
+                            className={`poly-vertex-group ${isVertexSelected ? "vertex-active" : ""}`}
+                            onPointerDown={(e) => handleVertexPointerDown(e, tIdx, editingLayer, pIdx)}
+                            onContextMenu={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleDeleteVertex(tIdx, editingLayer, pIdx);
+                            }}
+                            onDoubleClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteVertex(tIdx, editingLayer, pIdx);
+                            }}
+                          >
+                            {/* Large invisible hit area for effortless clicking and dragging */}
+                            <circle cx={pt[0]} cy={pt[1]} r={14} className="poly-vertex-hit-area" />
+                            {/* Visible vertex circle */}
+                            <circle
+                              cx={pt[0]}
+                              cy={pt[1]}
+                              r={isVertexSelected ? 8 : 6.5}
+                              className={`poly-vertex-handle ${isVertexSelected ? "selected" : ""}`}
+                            />
+                            {/* Point index badge when selected */}
+                            {isVertexSelected && (
+                              <text x={pt[0]} y={pt[1] - 12} textAnchor="middle" className="vertex-index-label">
+                                #{pIdx + 1}
+                              </text>
+                            )}
+                          </g>
+                        );
+                      })}
 
-                    {/* Table Name Badge */}
+                    {/* 5. Table Name Badge (Also acts as a drag handle for the whole table) */}
                     <g
                       transform={`translate(${centerX}, ${centerY})`}
                       className="table-badge-group"
-                      onClick={() => setSelectedTableIndex(tIdx)}
+                      onPointerDown={(e) => handlePolygonPointerDown(e, tIdx, "display")}
                     >
-                      <rect x="-35" y="-14" width="70" height="24" rx="4" className="badge-bg" />
-                      <text x="0" y="3" textAnchor="middle" className="badge-text">
-                        {table.name} ({table.capacity})
+                      <rect x="-38" y="-14" width="76" height="25" rx="5" className="badge-bg" />
+                      <text x="0" y="3.5" textAnchor="middle" className="badge-text">
+                        {table.name} ({table.capacity}м)
                       </text>
                     </g>
                   </g>
@@ -714,10 +1006,86 @@ export function SetupEditor({
                 </span>
               </div>
 
+              {/* Mode: Synchronous movement of both zones */}
+              <div className="sync-zones-toggle">
+                <label className="checkbox-control">
+                  <input
+                    type="checkbox"
+                    checked={syncBothZones}
+                    onChange={(e) => setSyncBothZones(e.target.checked)}
+                  />
+                  <span>🔗 Двигать стол и стулья вместе</span>
+                </label>
+              </div>
+
+              {/* Geometry Tools & Shape Presets */}
+              <div className="geometry-tools-section">
+                <div className="section-label">Форма и вершины стола:</div>
+                <div className="geometry-buttons-row">
+                  <button
+                    type="button"
+                    className="secondary-button geom-btn"
+                    onClick={handleAddVertexToLongestEdge}
+                    title="Добавить вершину на самое длинное ребро"
+                  >
+                    ➕ Добавить грань
+                  </button>
+                  {selectedVertexIndex !== null && (
+                    <button
+                      type="button"
+                      className="secondary-button danger-btn geom-btn"
+                      onClick={() => handleDeleteVertex(selectedTableIndex, editingLayer, selectedVertexIndex)}
+                      title="Удалить выбранную точку (клавиша Delete)"
+                    >
+                      🗑️ Удалить точку #{selectedVertexIndex + 1}
+                    </button>
+                  )}
+                </div>
+
+                <div className="shape-presets-container">
+                  <span className="preset-hint-label">Быстрые шаблоны формы:</span>
+                  <div className="preset-buttons-group">
+                    <button
+                      type="button"
+                      className="preset-pill-btn"
+                      onClick={() => handleMakeRound(selectedTableIndex, 8)}
+                      title="Сделать круглым с 8 вершинами"
+                    >
+                      ⚪ Круг (8)
+                    </button>
+                    <button
+                      type="button"
+                      className="preset-pill-btn"
+                      onClick={() => handleMakeRound(selectedTableIndex, 12)}
+                      title="Сделать овальным с 12 вершинами"
+                    >
+                      🔵 Овал (12)
+                    </button>
+                    <button
+                      type="button"
+                      className="preset-pill-btn"
+                      onClick={() => handleMakeRectangle(selectedTableIndex)}
+                      title="Сбросить в прямоугольник"
+                    >
+                      ⬛ Прямоугольник
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div className="round-table-tip">
-                💡 <strong>Подсказка для круглых столов:</strong>
+                💡 <strong>Управление разметкой:</strong>
                 <p>
-                  Кликайте на любое ребро стола (подсвечивается фиолетовым с плюсиком), чтобы добавить точки и получить круглую или овальную форму!
+                  • <strong>Перемещение стола:</strong> зажмите и тащите внутри стола (или за бейдж).
+                </p>
+                <p>
+                  • <strong>Форма стола:</strong> тащите белые точки вершин.
+                </p>
+                <p>
+                  • <strong>Добавить точку:</strong> кликайте на фиолетовый <strong>+</strong> на ребре.
+                </p>
+                <p>
+                  • <strong>Удалить точку:</strong> правый или двойной клик на точку (или кнопка «Удалить»).
                 </p>
               </div>
 
