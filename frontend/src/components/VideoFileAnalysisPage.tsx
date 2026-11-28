@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { SetupEditor } from "./SetupEditor";
 import { OrdersPanel } from "./OrdersPanel";
-import { uploadVideoFile, saveTableZones } from "../api";
+import { RestaurantStatusPanel } from "./RestaurantStatusPanel";
+import { uploadVideoFile, selectVideoFile, saveTableZones, fetchVideoList } from "../api";
 import type { DetectedTable, OrderDetails, TableZone } from "../types";
 
 const analyticsUrl = import.meta.env.VITE_ANALYTICS_URL || "http://localhost:5000";
@@ -13,25 +14,40 @@ interface VideoFileAnalysisPageProps {
 }
 
 type Step = "select" | "layout" | "playback";
+type StreamLayout = "split" | "video_only" | "status_only";
 
 export function VideoFileAnalysisPage({ initialZones, orders, onRefreshOrders }: VideoFileAnalysisPageProps) {
   const [step, setStep] = useState<Step>("select");
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string>(`${analyticsUrl}/videos/Cctv-Resturant-Demo.mp4`);
   const [videoName, setVideoName] = useState<string>("Cctv-Resturant-Demo.mp4");
+  const [availableVideos, setAvailableVideos] = useState<string[]>([]);
   const [customZones, setCustomZones] = useState<TableZone[]>(initialZones);
 
-  // Extracted frame from video
+  // Extracted frame from video for layout editor
   const [frameUrl, setFrameUrl] = useState<string | null>(null);
   const [frameDimensions, setFrameDimensions] = useState<{ width: number; height: number }>({ width: 1280, height: 720 });
   const [frameExtractionLoading, setFrameExtractionLoading] = useState(false);
 
-  // Playback state
+  // Playback & stream state
+  const [viewMode, setViewMode] = useState<"ai_stream" | "raw_video">("ai_stream");
+  const [streamLayout, setStreamLayout] = useState<StreamLayout>("split");
+  const [streamKey, setStreamKey] = useState<number>(() => Date.now());
+  const [streamError, setStreamError] = useState(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [syncingToServer, setSyncingToServer] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Load available server videos on mount
+  useEffect(() => {
+    void fetchVideoList().then((list) => {
+      if (list && list.length > 0) {
+        setAvailableVideos(list);
+      }
+    });
+  }, []);
 
   // Cleanup object URLs on unmount
   useEffect(() => {
@@ -91,7 +107,6 @@ export function VideoFileAnalysisPage({ initialZones, orders, onRefreshOrders }:
     setVideoName(file.name);
     setSyncMessage(null);
 
-    // Extract first frame for the layout editor
     setFrameExtractionLoading(true);
     try {
       const extracted = await extractFrameFromVideoUrl(objUrl);
@@ -99,23 +114,26 @@ export function VideoFileAnalysisPage({ initialZones, orders, onRefreshOrders }:
       setFrameDimensions({ width: extracted.width, height: extracted.height });
       setStep("layout");
     } catch {
-      // Fallback: still go to layout step
       setStep("layout");
     } finally {
       setFrameExtractionLoading(false);
     }
   }
 
-  async function handleLoadDemoVideo() {
-    const demo = `${analyticsUrl}/videos/Cctv-Resturant-Demo.mp4`;
+  async function handleSelectExistingVideo(selectedFilename: string) {
+    if (videoUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(videoUrl);
+    }
+
+    const url = `${analyticsUrl}/videos/${selectedFilename}`;
     setVideoFile(null);
-    setVideoUrl(demo);
-    setVideoName("Cctv-Resturant-Demo.mp4");
+    setVideoUrl(url);
+    setVideoName(selectedFilename);
     setSyncMessage(null);
 
     setFrameExtractionLoading(true);
     try {
-      const extracted = await extractFrameFromVideoUrl(demo);
+      const extracted = await extractFrameFromVideoUrl(url);
       setFrameUrl(extracted.url);
       setFrameDimensions({ width: extracted.width, height: extracted.height });
       setStep("layout");
@@ -126,23 +144,45 @@ export function VideoFileAnalysisPage({ initialZones, orders, onRefreshOrders }:
     }
   }
 
-  function handleSaveCustomZones(newZones: TableZone[]) {
+  async function handleApplyZonesAndStartAnalysis(newZones: TableZone[]) {
     setCustomZones(newZones);
-    setStep("playback");
-    setSyncMessage(`Разметка для видео «${videoName}» сохранена (${newZones.length} столов).`);
-  }
-
-  async function handleSyncWithServerAnalytics() {
     setSyncingToServer(true);
-    setSyncMessage("Синхронизация видео и разметки с сервером AI-аналитики...");
+    setSyncMessage(`Отправка видео «${videoName}» и персональной разметки (${newZones.length} столов) в сервис видеоаналитики Python...`);
     try {
       if (videoFile) {
         await uploadVideoFile(videoFile);
+      } else {
+        await selectVideoFile(videoName);
+      }
+
+      await saveTableZones(newZones);
+      setStreamKey(Date.now());
+      setStreamError(false);
+      setStep("playback");
+      setSyncMessage(`✅ Видео «${videoName}» и разметка столов (${newZones.length} столов) запущены в Python AI-сервисе!`);
+    } catch (err) {
+      setSyncMessage(`⚠️ Разметка сохранена локально, но при синхронизации с сервисом аналитики возникло предупреждение: ${err instanceof Error ? err.message : String(err)}`);
+      setStep("playback");
+    } finally {
+      setSyncingToServer(false);
+    }
+  }
+
+  async function handleRestartStream() {
+    setSyncingToServer(true);
+    setSyncMessage(`Перезапуск видео «${videoName}» в сервисе аналитики...`);
+    try {
+      if (videoFile) {
+        await uploadVideoFile(videoFile);
+      } else {
+        await selectVideoFile(videoName);
       }
       await saveTableZones(customZones);
-      setSyncMessage("✅ Видео и персональная разметка столов успешно загружены на сервер и активны!");
+      setStreamKey(Date.now());
+      setStreamError(false);
+      setSyncMessage(`✅ Видео «${videoName}» успешно перезапущено!`);
     } catch (err) {
-      setSyncMessage(`❌ Ошибка синхронизации: ${err instanceof Error ? err.message : String(err)}`);
+      setSyncMessage(`❌ Ошибка перезапуска: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setSyncingToServer(false);
     }
@@ -182,7 +222,7 @@ export function VideoFileAnalysisPage({ initialZones, orders, onRefreshOrders }:
         <div className="workflow-title-block">
           <h2>🎬 Анализ видеофайла со своей разметкой</h2>
           <p className="workflow-sub">
-            Загрузите свой видеофайл, настройте для него индивидуальные контуры столов и просматривайте видеозапись.
+            Загрузите свой видеофайл, настройте для него персональную разметку столов и смотрите видеопоток в сервисе AI-аналитики (Python :5000).
           </p>
         </div>
 
@@ -206,7 +246,7 @@ export function VideoFileAnalysisPage({ initialZones, orders, onRefreshOrders }:
             className={`step-pill ${step === "playback" ? "active" : ""}`}
             onClick={() => setStep("playback")}
           >
-            3️⃣ Просмотр с разметкой
+            3️⃣ AI-Анализ видеопотока
           </button>
         </div>
       </div>
@@ -223,11 +263,11 @@ export function VideoFileAnalysisPage({ initialZones, orders, onRefreshOrders }:
           <div className="file-dropzone-box">
             <span className="dropzone-icon">📁</span>
             <h3>Выберите видеозапись ресторана</h3>
-            <p>Поддерживаются форматы MP4, MOV, MKV, AVI, WebM с любой камеры видеонаблюдения.</p>
+            <p>Загрузите видеозапись с компьютера или выберите демонстрационное видео с сервера.</p>
 
             <div className="file-action-buttons">
               <label className="primary-button pick-file-btn">
-                📂 Выбрать видео с компьютера
+                📂 Загрузить видео с компьютера
                 <input
                   type="file"
                   accept="video/*"
@@ -236,18 +276,37 @@ export function VideoFileAnalysisPage({ initialZones, orders, onRefreshOrders }:
                 />
               </label>
 
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={handleLoadDemoVideo}
-                disabled={frameExtractionLoading}
-              >
-                🎥 Использовать демо-видео ресторана
-              </button>
+              {availableVideos.length > 0 ? (
+                <div className="server-videos-select-group">
+                  <span className="server-videos-label">Или выберите видео с сервера:</span>
+                  <div className="server-videos-btn-row">
+                    {availableVideos.map((fname) => (
+                      <button
+                        key={fname}
+                        type="button"
+                        className={`secondary-button ${videoName === fname ? "active-video-btn" : ""}`}
+                        onClick={() => handleSelectExistingVideo(fname)}
+                        disabled={frameExtractionLoading}
+                      >
+                        🎥 {fname}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => handleSelectExistingVideo("Cctv-Resturant-Demo.mp4")}
+                  disabled={frameExtractionLoading}
+                >
+                  🎥 Cctv-Resturant-Demo.mp4
+                </button>
+              )}
             </div>
 
             {frameExtractionLoading && (
-              <p className="frame-extraction-status">⏳ Извлечение первого кадра для редактора разметки...</p>
+              <p className="frame-extraction-status">⏳ Извлечение кадра для редактора разметки...</p>
             )}
           </div>
 
@@ -285,9 +344,10 @@ export function VideoFileAnalysisPage({ initialZones, orders, onRefreshOrders }:
             <button
               type="button"
               className="primary-button"
-              onClick={() => setStep("playback")}
+              disabled={syncingToServer}
+              onClick={() => void handleApplyZonesAndStartAnalysis(customZones)}
             >
-              Перейти к просмотру с этой разметкой ➡️
+              {syncingToServer ? "⏳ Применение к AI-сервису..." : "Запустить AI-анализ с этой разметкой ➡️"}
             </button>
           </div>
 
@@ -296,23 +356,26 @@ export function VideoFileAnalysisPage({ initialZones, orders, onRefreshOrders }:
             initialFrameUrl={frameUrl}
             initialFrameDimensions={frameDimensions}
             initialZones={customZones}
-            onSaveZones={handleSaveCustomZones}
-            title={`📐 Своя разметка столов для «${videoName}»`}
+            onSaveZones={(newZones) => void handleApplyZonesAndStartAnalysis(newZones)}
+            title={`📐 Персональная разметка столов для «${videoName}»`}
             subtitle="Проматывайте видео ползунком ниже, чтобы выбрать идеальный кадр для разметки. Двигайте вершины, добавляйте грани (скругление столов) или используйте автодетект YOLO."
-            saveButtonLabel="💾 Применить разметку к видео"
+            saveButtonLabel="💾 Применить разметку и запустить AI-анализ"
             showSaveDbButton={false}
             showVideoUpload={false}
           />
         </div>
       )}
 
-      {/* STEP 3: Video Playback with Custom Layout & Orders */}
+      {/* STEP 3: Video Stream & Analytics (Powered by Python Analytics :5000) */}
       {step === "playback" && (
         <div className="file-playback-pane">
+          {/* Top Control Bar */}
           <div className="playback-top-controls">
             <div className="playback-file-info">
-              <span>Видеозапись: <strong>{videoName}</strong></span>
+              <span className="live-pulse" />
+              <span>Видео: <strong>{videoName}</strong></span>
               <span className="zones-count-pill">{customZones.length} столов в разметке</span>
+              <span className="active-service-badge">⚡ Python AI Analytics (:5000)</span>
             </div>
 
             <div className="playback-actions">
@@ -327,60 +390,166 @@ export function VideoFileAnalysisPage({ initialZones, orders, onRefreshOrders }:
               <button
                 type="button"
                 className="secondary-button primary-accent"
-                onClick={handleSyncWithServerAnalytics}
+                onClick={() => void handleRestartStream()}
                 disabled={syncingToServer}
-                title="Отправить это видео и разметку на сервер для live AI-трансляции"
+                title="Перезапустить видео и обновить видеопоток с текущей разметкой"
               >
-                {syncingToServer ? "⏳ Синхронизация..." : "☁️ Загрузить в live AI-стрим"}
+                {syncingToServer ? "⏳ Обновление..." : "🔄 Перезапустить видеопоток"}
               </button>
             </div>
           </div>
 
-          {/* Video Player with Custom Polygons Overlay */}
-          <div className="video-frame">
-            <video
-              ref={videoRef}
-              key={videoUrl}
-              src={videoUrl}
-              controls
-              preload="metadata"
-              onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-            />
-
-            <div className="table-overlay" aria-hidden="true">
-              {detectedTablesForPlayback.map((table, index) => {
-                const tableOrders = orders.filter((o) => o.tableId === table.id);
-                const activeOrder = tableOrders.find(
-                  (o) => o.status === "Open" || o.status === 0 || o.status === "Paid" || o.status === 1
-                );
-
-                return (
-                  <div
-                    className="table-marker state-available"
-                    key={table.id}
-                    style={{
-                      left: `${table.bounds.x * 100}%`,
-                      top: `${table.bounds.y * 100}%`,
-                      width: `${table.bounds.width * 100}%`,
-                      height: `${table.bounds.height * 100}%`,
-                    }}
-                  >
-                    <span>
-                      {table.id || `Стол ${index + 1}`}
-                      <small className="state-pill available-pill">✅ Свободен</small>
-                      {activeOrder && (
-                        <strong className="table-active-order-badge">
-                          📋 {activeOrder.orderNumber || "Заказ"} ({activeOrder.totalAmount} ₽)
-                        </strong>
-                      )}
-                    </span>
-                  </div>
-                );
-              })}
+          {/* Mode Switcher Bar */}
+          <div className="viewer-mode-bar">
+            <div className="mode-toggle-group">
+              <button
+                type="button"
+                className={`mode-btn ${viewMode === "ai_stream" ? "active" : ""}`}
+                onClick={() => {
+                  setViewMode("ai_stream");
+                  setStreamError(false);
+                }}
+              >
+                📡 Поток AI-видеоаналитики (Real-Time)
+              </button>
+              <button
+                type="button"
+                className={`mode-btn ${viewMode === "raw_video" ? "active" : ""}`}
+                onClick={() => setViewMode("raw_video")}
+              >
+                🎥 Исходный видеоплеер (HTML5)
+              </button>
             </div>
+
+            {viewMode === "ai_stream" && (
+              <div className="stream-layout-toggles">
+                <span className="layout-toggle-label">Режим отображения:</span>
+                <button
+                  type="button"
+                  className={`layout-btn ${streamLayout === "split" ? "active" : ""}`}
+                  onClick={() => setStreamLayout("split")}
+                  title="Показать видеоролик и ресторанный статус раздельно"
+                >
+                  🖥️ Видео + Статус
+                </button>
+                <button
+                  type="button"
+                  className={`layout-btn ${streamLayout === "video_only" ? "active" : ""}`}
+                  onClick={() => setStreamLayout("video_only")}
+                  title="Полноэкранный видеоролик без боковых панелей"
+                >
+                  📺 Только AI-видео
+                </button>
+                <button
+                  type="button"
+                  className={`layout-btn ${streamLayout === "status_only" ? "active" : ""}`}
+                  onClick={() => setStreamLayout("status_only")}
+                  title="Только аналитическая панель статуса"
+                >
+                  📊 Только статус
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Orders Section for this video file */}
+          {/* Main Display: AI Stream or Raw Video Player */}
+          {viewMode === "ai_stream" ? (
+            <div className="stream-frame-container">
+              <div className={`ai-stream-split-layout layout-${streamLayout}`}>
+                {(streamLayout === "split" || streamLayout === "video_only") && (
+                  <div className="stream-video-pane">
+                    <div className="stream-video-header">
+                      <span className="video-stream-badge">
+                        🟢 Видеопоток аналитики: <strong>{videoName}</strong>
+                      </span>
+                      <span className="stream-fps-badge">
+                        MJPEG · Supervision · {customZones.length} столов
+                      </span>
+                    </div>
+
+                    {!streamError ? (
+                      <img
+                        key={streamKey}
+                        src={`${analyticsUrl}/stream/video?t=${streamKey}`}
+                        alt="AI Video Stream"
+                        className="ai-stream-img"
+                        onError={() => setStreamError(true)}
+                      />
+                    ) : (
+                      <div className="stream-fallback">
+                        <p>⚠️ Сервер видеоаналитики ({analyticsUrl}) не отвечает или перезапускается.</p>
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          onClick={() => {
+                            setStreamError(false);
+                            setStreamKey(Date.now());
+                          }}
+                        >
+                          🔄 Повторить подключение
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="stream-footer-info">
+                      <span>Камера / Файл: <strong>{videoName}</strong></span>
+                      <span>Модель: YOLO11 Pose + Детекция столов</span>
+                    </div>
+                  </div>
+                )}
+
+                {(streamLayout === "split" || streamLayout === "status_only") && (
+                  <div className="stream-status-pane">
+                    <RestaurantStatusPanel />
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="video-frame">
+              <video
+                ref={videoRef}
+                key={videoUrl}
+                src={videoUrl}
+                controls
+                preload="metadata"
+                onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+              />
+
+              <div className="table-overlay" aria-hidden="true">
+                {detectedTablesForPlayback.map((table, index) => {
+                  const tableOrders = orders.filter((o) => o.tableId === table.id);
+                  const activeOrder = tableOrders.find(
+                    (o) => o.status === "Open" || o.status === 0 || o.status === "Paid" || o.status === 1
+                  );
+
+                  return (
+                    <div
+                      className="table-marker state-available"
+                      key={table.id}
+                      style={{
+                        left: `${table.bounds.x * 100}%`,
+                        top: `${table.bounds.y * 100}%`,
+                        width: `${table.bounds.width * 100}%`,
+                        height: `${table.bounds.height * 100}%`,
+                      }}
+                    >
+                      <span>
+                        {table.id || `Стол ${index + 1}`}
+                        {activeOrder && (
+                          <strong className="table-active-order-badge">
+                            📋 {activeOrder.orderNumber || "Заказ"} ({activeOrder.totalAmount} ₽)
+                          </strong>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Orders Management for this video */}
           <OrdersPanel
             sessionId={`file-${videoName}`}
             tables={detectedTablesForPlayback}

@@ -189,6 +189,16 @@ def get_video_frame(time: float | None = None):
     )
 
 
+@app.get("/api/video/list")
+def list_videos():
+    """List available video files in the videos directory."""
+    if not VIDEOS_DIR.exists():
+        return {"videos": []}
+    extensions = {".mp4", ".mov", ".mkv", ".avi", ".webm"}
+    files = [f.name for f in VIDEOS_DIR.iterdir() if f.is_file() and f.suffix.lower() in extensions]
+    return {"videos": sorted(files)}
+
+
 @app.post("/api/video/upload")
 async def upload_video(file: UploadFile = File(...)):
     """Upload a new video file and switch playback to it."""
@@ -206,6 +216,20 @@ async def upload_video(file: UploadFile = File(...)):
         "filename": file.filename,
         "video_path": str(out_path),
     }
+
+
+@app.post("/api/video/select")
+def select_video(payload: dict):
+    """Switch active video to an existing file in videos directory."""
+    filename = payload.get("filename")
+    if not filename:
+        raise HTTPException(status_code=400, detail="Filename required")
+    clean_name = Path(filename).name
+    video_path = VIDEOS_DIR / clean_name
+    if not video_path.exists():
+        raise HTTPException(status_code=404, detail=f"Video file '{clean_name}' not found")
+    set_video_path(str(video_path))
+    return {"success": True, "filename": clean_name, "video_path": str(video_path)}
 
 
 @app.post("/api/tables/autodetect")

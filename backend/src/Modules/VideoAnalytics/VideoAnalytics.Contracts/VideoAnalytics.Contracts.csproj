@@ -1,7 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    <ProjectReference Include="../../Tables/Tables.Domain/Tables.Domain.csproj" />
-    <ProjectReference Include="../../Tables/Tables.Contracts/Tables.Contracts.csproj" />
-  </ItemGroup>
-</Project>

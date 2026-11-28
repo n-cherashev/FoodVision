@@ -1,50 +1,13 @@
 import type {
   AddOrderItemPayload,
-  AnalysisResult,
   OpenOrderPayload,
   OrderDetails,
   RestaurantStatus,
-  TableConfiguration,
-  TableOrderInterval,
   TableZone,
 } from "./types";
 
 const apiUrl = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
-
-async function postVideo(
-  path: string,
-  video: File,
-  signal: AbortSignal,
-  layout?: TableConfiguration[],
-  orders?: TableOrderInterval[],
-  sessionId?: string
-) {
-  const form = new FormData();
-  form.append("video", video);
-  if (layout) form.append("layout", JSON.stringify(layout));
-  if (orders && orders.length > 0) form.append("orders", JSON.stringify(orders));
-  if (sessionId) form.append("sessionId", sessionId);
-
-  const response = await fetch(`${apiUrl}/api/analysis${path}`, {
-    method: "POST",
-    body: form,
-    signal,
-  });
-
-  if (!response.ok) {
-    const detail = await response.text();
-    let message = detail;
-    try {
-      const payload = JSON.parse(detail) as { error?: string };
-      message = payload.error ?? detail;
-    } catch {
-      // Keep a plain-text server response readable as well.
-    }
-    throw new Error(message || `Сервер вернул ошибку ${response.status}.`);
-  }
-
-  return response.json();
-}
+const analyticsUrl = import.meta.env.VITE_ANALYTICS_URL ?? "http://localhost:5000";
 
 async function jsonRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${apiUrl}${endpoint}`, {
@@ -68,21 +31,6 @@ async function jsonRequest<T>(endpoint: string, options: RequestInit = {}): Prom
   }
 
   return response.json() as Promise<T>;
-}
-
-export async function prepareTables(video: File, signal: AbortSignal): Promise<TableConfiguration[]> {
-  const result = (await postVideo("/prepare", video, signal)) as { tables: TableConfiguration[] };
-  return result.tables;
-}
-
-export async function analyzeVideo(
-  video: File,
-  layout: TableConfiguration[],
-  orders: TableOrderInterval[],
-  signal: AbortSignal,
-  sessionId?: string
-): Promise<AnalysisResult> {
-  return postVideo("", video, signal, layout, orders, sessionId) as Promise<AnalysisResult>;
 }
 
 export async function openOrder(payload: OpenOrderPayload): Promise<OrderDetails> {
@@ -157,8 +105,6 @@ export async function getOrderById(orderId: string): Promise<OrderDetails> {
   return jsonRequest<OrderDetails>(`/api/orders/${encodeURIComponent(orderId)}`);
 }
 
-const analyticsUrl = import.meta.env.VITE_ANALYTICS_URL ?? "http://localhost:5000";
-
 export async function fetchCurrentFrame(time?: number): Promise<{ url: string; time: number; width: number; height: number }> {
   const query = time !== undefined ? `?time=${time}` : "";
   const res = await fetch(`${analyticsUrl}/api/video/frame${query}`);
@@ -179,6 +125,29 @@ export async function uploadVideoFile(file: File): Promise<{ success: boolean; f
   });
   if (!res.ok) throw new Error("Не удалось загрузить видеофайл.");
   return res.json();
+}
+
+export async function selectVideoFile(filename: string): Promise<{ success: boolean; filename: string; video_path: string }> {
+  const res = await fetch(`${analyticsUrl}/api/video/select`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename }),
+  });
+  if (!res.ok) throw new Error("Не удалось выбрать видеофайл на сервере аналитики.");
+  return res.json();
+}
+
+export async function fetchVideoList(): Promise<string[]> {
+  try {
+    const res = await fetch(`${analyticsUrl}/api/video/list`);
+    if (res.ok) {
+      const data = await res.json();
+      return data.videos || [];
+    }
+  } catch {
+    // fallback
+  }
+  return ["Cctv-Resturant-Demo.mp4", "Sample_Video_1.mp4", "anuj_restaurant_sample.mp4"];
 }
 
 export async function autoDetectTables(time?: number, fileBlob?: Blob | File): Promise<TableZone[]> {

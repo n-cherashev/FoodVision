@@ -1,9 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    <PackageReference Include="CSharpFunctionalExtensions" Version="3.7.0" />
-    <ProjectReference Include="../VideoAnalytics.Contracts/VideoAnalytics.Contracts.csproj" />
-    <ProjectReference Include="../../Tables/Tables.Domain/Tables.Domain.csproj" />
-    <ProjectReference Include="../../../Shared/Shared.Core/Shared.Core.csproj" />
-  </ItemGroup>
-</Project>
