@@ -20,6 +20,17 @@ interface DragStateTable {
 
 type DragState = DragStateVertex | DragStateTable | null;
 
+export interface ActionMenuState {
+  screenX: number;
+  screenY: number;
+  svgCoords: { x: number; y: number };
+  targetType: "table" | "vertex" | "edge";
+  tableIndex: number;
+  layer: "display" | "counting";
+  pointIndex?: number;
+  edgeIndex?: number;
+}
+
 export interface SetupEditorProps {
   videoSource?: string | null;
   initialFrameUrl?: string | null;
@@ -48,7 +59,7 @@ export function SetupEditor({
   initialZones,
   onSaveZones,
   title = "📐 Интерактивный редактор столов (Геозоны)",
-  subtitle = "Кликните по линии стола, чтобы добавить точку (скругление для круглых столов). Перетаскивайте вершины мышкой. Правый клик — удалить точку.",
+  subtitle = "Зажмите и тащите стол или вершину для перемещения. Кликните для вызова меню действий (добавить/удалить точку, скругление).",
   saveButtonLabel = "💾 Сохранить разметку",
   showSaveDbButton = true,
   showVideoUpload = true,
@@ -64,7 +75,13 @@ export function SetupEditor({
   const [syncBothZones, setSyncBothZones] = useState<boolean>(true);
   const [selectedVertexIndex, setSelectedVertexIndex] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [actionMenu, setActionMenu] = useState<ActionMenuState | null>(null);
+
   const dragTargetRef = useRef<DragState>(null);
+  const pointerDownPosRef = useRef<{ clientX: number; clientY: number } | null>(null);
+  const hasDraggedRef = useRef<boolean>(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -323,11 +340,57 @@ export function SetupEditor({
     };
   }
 
-  function startDrag(drag: NonNullable<DragState>) {
+  function findClosestEdge(
+    poly: PolygonPoint[],
+    pt: { x: number; y: number }
+  ): { edgeIndex: number; projected: PolygonPoint } {
+    if (poly.length < 2) return { edgeIndex: 0, projected: [pt.x, pt.y] };
+    let minDist = Infinity;
+    let bestEdge = 0;
+    let bestProj: PolygonPoint = poly[0];
+
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i];
+      const b = poly[(i + 1) % poly.length];
+      const abx = b[0] - a[0];
+      const aby = b[1] - a[1];
+      const lenSq = abx * abx + aby * aby;
+      let t = lenSq === 0 ? 0 : ((pt.x - a[0]) * abx + (pt.y - a[1]) * aby) / lenSq;
+      t = Math.max(0, Math.min(1, t));
+      const projX = Math.round(a[0] + t * abx);
+      const projY = Math.round(a[1] + t * aby);
+      const dist = Math.hypot(pt.x - projX, pt.y - projY);
+      if (dist < minDist) {
+        minDist = dist;
+        bestEdge = i;
+        bestProj = [projX, projY];
+      }
+    }
+
+    return { edgeIndex: bestEdge, projected: bestProj };
+  }
+
+  function startDrag(
+    drag: NonNullable<DragState>,
+    clickMenuInfo?: ActionMenuState
+  ) {
     dragTargetRef.current = drag;
     setIsDragging(true);
 
     const handleWindowPointerMove = (ev: PointerEvent) => {
+      if (pointerDownPosRef.current) {
+        const dist = Math.hypot(
+          ev.clientX - pointerDownPosRef.current.clientX,
+          ev.clientY - pointerDownPosRef.current.clientY
+        );
+        if (dist > 4) {
+          hasDraggedRef.current = true;
+          setActionMenu(null);
+        }
+      }
+
+      if (!hasDraggedRef.current) return;
+
       const cur = dragTargetRef.current;
       if (!cur || !svgRef.current) return;
 
@@ -403,12 +466,21 @@ export function SetupEditor({
       }
     };
 
-    const handleWindowPointerUp = () => {
+    const handleWindowPointerUp = (ev: PointerEvent) => {
       dragTargetRef.current = null;
       setIsDragging(false);
       window.removeEventListener("pointermove", handleWindowPointerMove);
       window.removeEventListener("pointerup", handleWindowPointerUp);
       window.removeEventListener("pointercancel", handleWindowPointerUp);
+
+      // If released without significant dragging, trigger the Action Menu!
+      if (!hasDraggedRef.current && clickMenuInfo) {
+        setActionMenu({
+          ...clickMenuInfo,
+          screenX: ev.clientX,
+          screenY: ev.clientY,
+        });
+      }
     };
 
     window.addEventListener("pointermove", handleWindowPointerMove, { passive: false });
@@ -441,14 +513,27 @@ export function SetupEditor({
     const currentTable = zones[tableIndex];
     if (!currentTable) return;
 
-    startDrag({
-      kind: "whole_table",
-      tableIndex,
-      syncZones: syncBothZones,
-      startSvg: coords,
-      initialDisplay: currentTable.displayPolygon.map((p) => [...p]),
-      initialCounting: currentTable.countingPolygon.map((p) => [...p]),
-    });
+    pointerDownPosRef.current = { clientX: e.clientX, clientY: e.clientY };
+    hasDraggedRef.current = false;
+
+    startDrag(
+      {
+        kind: "whole_table",
+        tableIndex,
+        syncZones: syncBothZones,
+        startSvg: coords,
+        initialDisplay: currentTable.displayPolygon.map((p) => [...p]),
+        initialCounting: currentTable.countingPolygon.map((p) => [...p]),
+      },
+      {
+        screenX: e.clientX,
+        screenY: e.clientY,
+        svgCoords: coords,
+        targetType: "table",
+        tableIndex,
+        layer,
+      }
+    );
   }
 
   function handleVertexPointerDown(
@@ -465,20 +550,89 @@ export function SetupEditor({
     setEditingLayer(layer);
     setSelectedVertexIndex(pointIndex);
 
-    startDrag({
-      kind: "vertex",
-      tableIndex,
-      layer,
-      pointIndex,
-    });
+    const coords = getSvgPoint(
+      svgRef.current,
+      e.clientX,
+      e.clientY,
+      frameDimensions.width,
+      frameDimensions.height
+    ) || { x: 0, y: 0 };
+
+    pointerDownPosRef.current = { clientX: e.clientX, clientY: e.clientY };
+    hasDraggedRef.current = false;
+
+    startDrag(
+      {
+        kind: "vertex",
+        tableIndex,
+        layer,
+        pointIndex,
+      },
+      {
+        screenX: e.clientX,
+        screenY: e.clientY,
+        svgCoords: coords,
+        targetType: "vertex",
+        tableIndex,
+        layer,
+        pointIndex,
+      }
+    );
+  }
+
+  function handleEdgePointerDown(
+    e: ReactPointerEvent,
+    tableIndex: number,
+    layer: "display" | "counting",
+    edgeIndex: number
+  ) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    setSelectedTableIndex(tableIndex);
+    setEditingLayer(layer);
+
+    const coords = getSvgPoint(
+      svgRef.current,
+      e.clientX,
+      e.clientY,
+      frameDimensions.width,
+      frameDimensions.height
+    ) || { x: 0, y: 0 };
+
+    const currentTable = zones[tableIndex];
+    if (!currentTable) return;
+
+    pointerDownPosRef.current = { clientX: e.clientX, clientY: e.clientY };
+    hasDraggedRef.current = false;
+
+    startDrag(
+      {
+        kind: "whole_table",
+        tableIndex,
+        syncZones: syncBothZones,
+        startSvg: coords,
+        initialDisplay: currentTable.displayPolygon.map((p) => [...p]),
+        initialCounting: currentTable.countingPolygon.map((p) => [...p]),
+      },
+      {
+        screenX: e.clientX,
+        screenY: e.clientY,
+        svgCoords: coords,
+        targetType: "edge",
+        tableIndex,
+        layer,
+        edgeIndex,
+      }
+    );
   }
 
   function handleInsertVertexAtEdge(
     tableIndex: number,
     layer: "display" | "counting",
     edgeStartIndex: number,
-    insertCoords?: { x: number; y: number },
-    startDraggingImmediately: boolean = false
+    insertCoords?: { x: number; y: number }
   ) {
     const newIdx = edgeStartIndex + 1;
     setSelectedTableIndex(tableIndex);
@@ -508,15 +662,6 @@ export function SetupEditor({
     });
 
     setStatusMessage(`✨ Добавлена новая вершина! Перетаскивайте её для скругления стола.`);
-
-    if (startDraggingImmediately) {
-      startDrag({
-        kind: "vertex",
-        tableIndex,
-        layer,
-        pointIndex: newIdx,
-      });
-    }
   }
 
   function handleDeleteVertex(tableIndex: number, layer: "display" | "counting", pointIndex: number) {
@@ -650,7 +795,15 @@ export function SetupEditor({
           handleDeleteVertex(selectedTableIndex, editingLayer, selectedVertexIndex);
         }
       } else if (e.key === "Escape") {
-        setSelectedVertexIndex(null);
+        if (actionMenu) {
+          setActionMenu(null);
+        } else if (isFullscreen) {
+          setIsFullscreen(false);
+        } else {
+          setSelectedVertexIndex(null);
+        }
+      } else if (e.key === "f" || e.key === "F" || e.key === "а" || e.key === "А") {
+        setIsFullscreen((prev) => !prev);
       }
     }
 
@@ -661,14 +814,26 @@ export function SetupEditor({
   const selectedTable = zones[selectedTableIndex] || null;
 
   return (
-    <div className="polygon-editor-container">
+    <div
+      ref={containerRef}
+      className={`polygon-editor-container ${isFullscreen ? "fullscreen-mode" : ""}`}
+    >
       <div className="editor-topbar">
         <div className="editor-title-group">
-          <h2>{title}</h2>
+          <h2>{title} {isFullscreen && <span className="fullscreen-badge">⛶ Полный экран</span>}</h2>
           <p className="editor-subtitle">{subtitle}</p>
         </div>
 
         <div className="editor-actions">
+          <button
+            type="button"
+            className={`secondary-button fullscreen-btn ${isFullscreen ? "active" : ""}`}
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            title="Полноэкранный режим (F / Esc)"
+          >
+            {isFullscreen ? "✕ Выйти из полного экрана" : "⛶ Во весь экран"}
+          </button>
+
           {showVideoUpload && (
             <label className="secondary-button upload-video-label">
               📁 Загрузить видео
@@ -775,13 +940,10 @@ export function SetupEditor({
                       onPointerDown={(e) => handlePolygonPointerDown(e, tIdx, "display")}
                     />
 
-                    {/* 3. Edge interaction zones (Click edge or '+' to insert vertex) */}
+                    {/* 3. Edge interaction zones (Click edge to open menu with 'Add vertex' action) */}
                     {isSelected &&
                       activePoly.map((p1, pIdx) => {
                         const p2 = activePoly[(pIdx + 1) % activePoly.length];
-                        const midX = (p1[0] + p2[0]) / 2;
-                        const midY = (p1[1] + p2[1]) / 2;
-
                         return (
                           <g key={`edge-${pIdx}`} className="edge-group">
                             <line
@@ -790,30 +952,8 @@ export function SetupEditor({
                               x2={p2[0]}
                               y2={p2[1]}
                               className="edge-hover-line"
-                              onPointerDown={(e) => {
-                                if (e.button !== 0) return;
-                                e.stopPropagation();
-                                e.preventDefault();
-                                const coords = getSvgPoint(svgRef.current, e.clientX, e.clientY, frameDimensions.width, frameDimensions.height);
-                                handleInsertVertexAtEdge(tIdx, editingLayer, pIdx, coords || undefined, true);
-                              }}
+                              onPointerDown={(e) => handleEdgePointerDown(e, tIdx, editingLayer, pIdx)}
                             />
-                            {/* Midpoint '+' handle */}
-                            <g
-                              className="edge-split-handle-group"
-                              onPointerDown={(e) => {
-                                if (e.button !== 0) return;
-                                e.stopPropagation();
-                                e.preventDefault();
-                                handleInsertVertexAtEdge(tIdx, editingLayer, pIdx, { x: midX, y: midY }, true);
-                              }}
-                            >
-                              <circle cx={midX} cy={midY} r={12} className="edge-split-hit-area" />
-                              <circle cx={midX} cy={midY} r={6} className="edge-split-handle" />
-                              <text x={midX} y={midY + 3.5} textAnchor="middle" className="edge-split-plus">
-                                +
-                              </text>
-                            </g>
                           </g>
                         );
                       })}
@@ -1076,16 +1216,16 @@ export function SetupEditor({
               <div className="round-table-tip">
                 💡 <strong>Управление разметкой:</strong>
                 <p>
-                  • <strong>Перемещение стола:</strong> зажмите и тащите внутри стола (или за бейдж).
+                  • <strong>Перемещение стола:</strong> зажмите ЛКМ и тащите стол в любое место.
                 </p>
                 <p>
-                  • <strong>Форма стола:</strong> тащите белые точки вершин.
+                  • <strong>Перемещение вершины:</strong> зажмите белую точку и тяните.
                 </p>
                 <p>
-                  • <strong>Добавить точку:</strong> кликайте на фиолетовый <strong>+</strong> на ребре.
+                  • <strong>Меню действий:</strong> просто кликните по столу, ребру или вершине для добавления/удаления точек.
                 </p>
                 <p>
-                  • <strong>Удалить точку:</strong> правый или двойной клик на точку (или кнопка «Удалить»).
+                  • <strong>Полноэкранный режим:</strong> кнопка «⛶ Во весь экран» или клавиша <strong>F</strong>.
                 </p>
               </div>
 
@@ -1104,6 +1244,195 @@ export function SetupEditor({
           )}
         </aside>
       </div>
+
+      {/* Floating Action Menu & Backdrop */}
+      {actionMenu && (
+        <>
+          <div
+            className="action-menu-backdrop"
+            onClick={() => setActionMenu(null)}
+          />
+          <div
+            className="editor-floating-action-menu"
+            style={{
+              left: `${Math.min(window.innerWidth - 250, Math.max(12, actionMenu.screenX))}px`,
+              top: `${Math.min(window.innerHeight - 340, Math.max(12, actionMenu.screenY))}px`,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="action-menu-header">
+              {actionMenu.targetType === "vertex" && (
+                <span>📍 Точка #{actionMenu.pointIndex! + 1} ({zones[actionMenu.tableIndex]?.name})</span>
+              )}
+              {actionMenu.targetType === "edge" && (
+                <span>📏 Ребро #{actionMenu.edgeIndex! + 1} ({zones[actionMenu.tableIndex]?.name})</span>
+              )}
+              {actionMenu.targetType === "table" && (
+                <span>🏷️ Стол {zones[actionMenu.tableIndex]?.name} ({zones[actionMenu.tableIndex]?.capacity}м)</span>
+              )}
+              <button
+                type="button"
+                className="action-menu-close"
+                onClick={() => setActionMenu(null)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="action-menu-body">
+              {actionMenu.targetType === "vertex" && (
+                <>
+                  <button
+                    type="button"
+                    className="action-menu-item danger"
+                    onClick={() => {
+                      handleDeleteVertex(actionMenu.tableIndex, actionMenu.layer, actionMenu.pointIndex!);
+                      setActionMenu(null);
+                    }}
+                  >
+                    🗑️ Удалить эту точку
+                  </button>
+                  <button
+                    type="button"
+                    className="action-menu-item"
+                    onClick={() => {
+                      handleInsertVertexAtEdge(
+                        actionMenu.tableIndex,
+                        actionMenu.layer,
+                        actionMenu.pointIndex!,
+                        undefined
+                      );
+                      setActionMenu(null);
+                    }}
+                  >
+                    ➕ Добавить точку после неё
+                  </button>
+                </>
+              )}
+
+              {actionMenu.targetType === "edge" && (
+                <>
+                  <button
+                    type="button"
+                    className="action-menu-item primary"
+                    onClick={() => {
+                      handleInsertVertexAtEdge(
+                        actionMenu.tableIndex,
+                        actionMenu.layer,
+                        actionMenu.edgeIndex!,
+                        actionMenu.svgCoords
+                      );
+                      setActionMenu(null);
+                    }}
+                  >
+                    ➕ Добавить вершину сюда
+                  </button>
+                  <button
+                    type="button"
+                    className="action-menu-item"
+                    onClick={() => {
+                      handleMakeRound(actionMenu.tableIndex, 8);
+                      setActionMenu(null);
+                    }}
+                  >
+                    ⚪ Скруглить в круг (8)
+                  </button>
+                  <button
+                    type="button"
+                    className="action-menu-item"
+                    onClick={() => {
+                      handleMakeRound(actionMenu.tableIndex, 12);
+                      setActionMenu(null);
+                    }}
+                  >
+                    🔵 Скруглить в овал (12)
+                  </button>
+                </>
+              )}
+
+              {actionMenu.targetType === "table" && (
+                <>
+                  <button
+                    type="button"
+                    className="action-menu-item primary"
+                    onClick={() => {
+                      const table = zones[actionMenu.tableIndex];
+                      if (table) {
+                        const poly = actionMenu.layer === "display" ? table.displayPolygon : table.countingPolygon;
+                        const { edgeIndex, projected } = findClosestEdge(poly, actionMenu.svgCoords);
+                        handleInsertVertexAtEdge(
+                          actionMenu.tableIndex,
+                          actionMenu.layer,
+                          edgeIndex,
+                          { x: projected[0], y: projected[1] }
+                        );
+                      }
+                      setActionMenu(null);
+                    }}
+                  >
+                    ➕ Добавить вершину на грань
+                  </button>
+
+                  <button
+                    type="button"
+                    className="action-menu-item"
+                    onClick={() => {
+                      setEditingLayer(actionMenu.layer === "display" ? "counting" : "display");
+                      setActionMenu(null);
+                    }}
+                  >
+                    🔀 {actionMenu.layer === "display" ? "Перейти к зоне стульев 🟨" : "Перейти к столешнице 🟦"}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="action-menu-item"
+                    onClick={() => {
+                      handleMakeRound(actionMenu.tableIndex, 8);
+                      setActionMenu(null);
+                    }}
+                  >
+                    ⚪ Сделать круглым (8 вершин)
+                  </button>
+
+                  <button
+                    type="button"
+                    className="action-menu-item"
+                    onClick={() => {
+                      handleMakeRound(actionMenu.tableIndex, 12);
+                      setActionMenu(null);
+                    }}
+                  >
+                    🔵 Сделать овальным (12 вершин)
+                  </button>
+
+                  <button
+                    type="button"
+                    className="action-menu-item"
+                    onClick={() => {
+                      handleMakeRectangle(actionMenu.tableIndex);
+                      setActionMenu(null);
+                    }}
+                  >
+                    ⬛ Сделать прямоугольным (4)
+                  </button>
+
+                  <button
+                    type="button"
+                    className="action-menu-item danger"
+                    onClick={() => {
+                      handleDeleteSelectedTable();
+                      setActionMenu(null);
+                    }}
+                  >
+                    🗑️ Удалить этот стол
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
